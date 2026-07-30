@@ -1,19 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { GoogleIcon } from './GoogleIcon';
+import { createClient } from '@/lib/supabase/clients';
 
 export function GoogleButton({ redirectTo }: { redirectTo?: string }) {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const supabase = createClient();
 
-  function handleGoogle() {
+  async function handleGoogle() {
     setLoading(true);
-    // Interface seule : redirection simulée après un court délai.
-    setTimeout(() => {
-      router.push(redirectTo ?? '/tableau-de-bord');
-    }, 900);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${redirectTo ?? '/tableau-de-bord'}`,
+      },
+    });
+
+    if (error) {
+      setLoading(false);
+      console.error('Erreur de connexion Google :', error.message);
+    }
+    // Pas de redirection manuelle ici : Supabase redirige automatiquement
+    // vers Google, puis revient sur /auth/callback.
   }
 
   return (

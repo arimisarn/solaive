@@ -9,6 +9,7 @@ import { GoogleButton } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/clients';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,6 +28,7 @@ function validatePassword(pw: string): string | undefined {
 
 export default function InscriptionPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -58,15 +60,37 @@ export default function InscriptionPage() {
     !validatePassword(password) &&
     password === confirm;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isFormValid) return;
     setLoading(true);
-    // Interface seule : redirection simulée après un court délai.
-    setTimeout(() => {
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message === 'User already registered'
+        ? 'Un compte existe déjà avec cet email.'
+        : "Une erreur est survenue. Réessaie."
+      );
+      return;
+    }
+
+    if (data.session) {
+      // Session créée immédiatement (confirmation email non bloquante)
       toast.success('Bienvenue sur Solaive !');
       router.push('/tableau-de-bord');
-    }, 900);
+      router.refresh();
+    } else {
+      // Cas rare : pas de session retournée, on redirige quand même
+      // vers la connexion pour éviter de bloquer l'utilisateur.
+      toast.info('Compte créé, connecte-toi pour continuer.');
+      router.push('/connexion');
+    }
   }
 
   return (
