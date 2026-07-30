@@ -8,25 +8,41 @@ import { AuthCard } from '@/components/auth/AuthCard';
 import { GoogleButton } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createClient } from '@/lib/supabase/clients';
 
 export default function ConnexionPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!email || !password) return;
     setLoading(true);
-    // Interface seule : connexion simulée. Identifiants acceptés par défaut.
-    setTimeout(() => {
-      setLoading(false);
-      router.push('/tableau-de-bord');
-    }, 900);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (signInError) {
+      setError(
+        signInError.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.'
+          : 'Une erreur est survenue. Réessaie.'
+      );
+      return;
+    }
+
+    router.push('/tableau-de-bord');
+    router.refresh();
   }
 
   return (

@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { LogOut, PenLine, Users, StickyNote } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
+import { createClient } from '@/lib/supabase/clients';
 
 const ACTIONS = [
   { icon: PenLine, label: 'Nouveau tableau', href: '#' },
@@ -11,6 +13,15 @@ const ACTIONS = [
 ];
 
 export default function TableauDeBordPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push('/connexion');
+    router.refresh();
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <EmailVerificationBanner />
@@ -20,13 +31,14 @@ export default function TableauDeBordPage() {
             Solaive
           </Link>
           <div className="flex items-center gap-4">
-            <Link
-              href="/connexion"
+            <button
+              type="button"
+              onClick={handleLogout}
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:border-accent/40 hover:text-accent"
             >
               <LogOut className="h-4 w-4" />
               Déconnexion
-            </Link>
+            </button>
           </div>
         </div>
       </header>
