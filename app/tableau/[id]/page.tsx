@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Tldraw } from 'tldraw';
+import { Tldraw, computed, createUserId, inlineBase64AssetStore, UserRecordType } from 'tldraw';
 import 'tldraw/tldraw.css';
+import { useSync } from '@tldraw/sync';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
+
+const CURSOR_COLORS = ['#7C3AED', '#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#EC4899'];
+
+function colorForUser(id: string) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return CURSOR_COLORS[hash % CURSOR_COLORS.length];
+}
 
 export default function TableauPage() {
     const { id } = useParams<{ id: string }>();
@@ -13,6 +22,7 @@ export default function TableauPage() {
     const supabase = createClient();
 
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
+    const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
 
     useEffect(() => {
         async function checkAccess() {
@@ -21,6 +31,11 @@ export default function TableauPage() {
                 router.push('/connexion');
                 return;
             }
+
+            setUserInfo({
+                id: userData.user.id,
+                name: userData.user.email?.split('@')[0] ?? 'Utilisateur',
+            });
 
             const { data, error } = await supabase
                 .from('tableaux')
@@ -39,6 +54,26 @@ export default function TableauPage() {
 
         checkAccess();
     }, [id, router, supabase]);
+
+    const currentUser = useMemo(
+        () =>
+            computed('current-user', () =>
+                userInfo
+                    ? UserRecordType.create({
+                        id: createUserId(userInfo.id),
+                        name: userInfo.name,
+                        color: colorForUser(userInfo.id),
+                    })
+                    : null
+            ),
+        [userInfo]
+    );
+
+    const store = useSync({
+        uri: `ws://localhost:5858/connect/${id}`,
+        assets: inlineBase64AssetStore, // provisoire, on branchera un vrai stockage plus tard
+        users: { currentUser },
+    });
 
     if (status === 'checking') {
         return (
@@ -65,7 +100,7 @@ export default function TableauPage() {
 
     return (
         <div className="fixed inset-0">
-            <Tldraw persistenceKey={`solaive-${id}`} />
+            <Tldraw store={store} />
         </div>
     );
 }
