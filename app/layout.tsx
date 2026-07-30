@@ -1,6 +1,6 @@
 import './globals.css';
+import '@/lib/fonts';
 import type { Metadata } from 'next';
-import { inter, spaceGrotesk } from '@/lib/fonts';
 import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
@@ -16,11 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="fr"
-      className={`${inter.variable} ${spaceGrotesk.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="fr" suppressHydrationWarning>
       <body className="font-sans">
         {children}
         <Toaster position="top-center" richColors />
