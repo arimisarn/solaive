@@ -5,21 +5,35 @@ import { Loader2, MailCheck } from 'lucide-react';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/clients';
 
 export default function MotDePasseOubliePage() {
+  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email) return;
     setLoading(true);
-    // Interface seule : envoi simulé. Message neutre délibéré.
-    setTimeout(() => {
-      setLoading(false);
-      setSent(true);
-    }, 900);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/mettre-a-jour-mot-de-passe`,
+    });
+
+    setLoading(false);
+
+    // Message volontairement neutre : que le compte existe ou non,
+    // on affiche la même chose (évite de révéler quels emails sont inscrits).
+    // On ne bloque que sur une vraie erreur technique (réseau, rate limit).
+    if (error && error.status !== 400) {
+      toast.error("Une erreur est survenue. Réessaie dans quelques instants.");
+      return;
+    }
+
+    setSent(true);
   }
 
   return (

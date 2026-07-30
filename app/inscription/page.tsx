@@ -81,7 +81,17 @@ export default function InscriptionPage() {
     }
 
     if (data.session) {
-      // Session créée immédiatement (confirmation email non bloquante)
+      // Session créée immédiatement (accès non bloquant). L'email de
+      // vérification est envoyé séparément, sans attendre la réponse :
+      // le suivi se fait via profiles.email_verified_at, pas via la session.
+      supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/auth/verify-email`,
+        },
+      });
+
       toast.success('Bienvenue sur Solaive !');
       router.push('/tableau-de-bord');
       router.refresh();
