@@ -1,4 +1,7 @@
+'use client';
+
 import { FilePlus2, UserPlus, Radio } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const STEPS = [
   {
@@ -24,23 +27,49 @@ const STEPS = [
   },
 ];
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+};
+
+const gridContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.12 },
+  },
+};
+
 export function HowItWorks() {
   return (
     <section className="border-t border-border/60 bg-card/50">
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <motion.div
+          className="mx-auto max-w-2xl text-center"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
           <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Comment ça marche
           </h2>
           <p className="mt-4 text-lg text-foreground/70">
             Trois étapes, moins d’une minute, et vous êtes prêt à créer.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="mt-14 grid gap-8 md:grid-cols-3">
+        <motion.div
+          className="mt-14 grid gap-8 md:grid-cols-3"
+          variants={gridContainer}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-100px' }}
+        >
           {STEPS.map((step, index) => (
-            <div
+            <motion.div
               key={step.number}
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
               className="relative flex flex-col items-center text-center"
             >
               {/* connecteur horizontal */}
@@ -64,9 +93,9 @@ export function HowItWorks() {
               <p className="mt-2 max-w-xs text-sm leading-relaxed text-foreground/70">
                 {step.description}
               </p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

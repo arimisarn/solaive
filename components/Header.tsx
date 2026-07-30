@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const NAV_LINKS = [
   { label: 'Fonctionnalités', href: '#fonctionnalites' },
@@ -14,7 +15,12 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-md">
+    <motion.header
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-md"
+    >
       <nav
         className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
         aria-label="Navigation principale"
@@ -85,6 +91,6 @@ export function Header() {
           </ul>
         </div>
       )}
-    </header>
+    </motion.header>
   );
 }

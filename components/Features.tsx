@@ -1,3 +1,5 @@
+'use client';
+
 import {
   PencilLine,
   Users,
@@ -6,6 +8,7 @@ import {
   Infinity as InfinityIcon,
   MessageSquare,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const FEATURES = [
   {
@@ -46,6 +49,18 @@ const FEATURES = [
   },
 ];
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+};
+
+const gridContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
 export function Features() {
   return (
     <section
@@ -53,7 +68,13 @@ export function Features() {
       className="border-t border-border/60 bg-background"
     >
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <motion.div
+          className="mx-auto max-w-2xl text-center"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
           <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Tout ce qu’il faut pour penser ensemble
           </h2>
@@ -61,12 +82,20 @@ export function Features() {
             Des outils simples pour des idées claires. Conçu pour la vitesse et
             la fluidité, sans courbe d’apprentissage.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <motion.div
+          className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          variants={gridContainer}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-100px' }}
+        >
           {FEATURES.map((feature) => (
-            <article
+            <motion.article
               key={feature.title}
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
               className="group rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent/10 text-accent transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
@@ -78,9 +107,9 @@ export function Features() {
               <p className="mt-2 text-sm leading-relaxed text-foreground/70">
                 {feature.description}
               </p>
-            </article>
+            </motion.article>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

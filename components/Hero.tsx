@@ -1,5 +1,20 @@
+'use client';
+
 import { ArrowRight, Play, MousePointer2, PenTool } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+};
+
+const textContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.09, delayChildren: 0.05 },
+  },
+};
 
 function NamedCursor({
   name,
@@ -40,24 +55,45 @@ export function Hero() {
       <div className="mx-auto max-w-7xl px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Texte */}
-          <div className="text-center lg:text-left">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground/70">
+          <motion.div
+            className="text-center lg:text-left"
+            variants={textContainer}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.span
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground/70"
+            >
               <span className="h-2 w-2 rounded-full bg-accent" />
               Collaboration en temps réel
-            </span>
+            </motion.span>
 
-            <h1 className="mt-6 font-heading text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            <motion.h1
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="mt-6 font-heading text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl"
+            >
               Créez ensemble,
               <br />
               <span className="text-accent">en temps réel</span>
-            </h1>
+            </motion.h1>
 
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-foreground/70 lg:mx-0">
+            <motion.p
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-foreground/70 lg:mx-0"
+            >
               Un tableau blanc infini où votre équipe dessine, écrit et
               organisse ses idées ensemble, en direct, depuis n’importe où.
-            </p>
+            </motion.p>
 
-            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
+            <motion.div
+              variants={fadeUp}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start"
+            >
               <Link
                 href="/inscription"
                 className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 text-base font-medium text-accent-foreground transition-all hover:bg-accent/90 hover:shadow-sm sm:w-auto"
@@ -72,11 +108,16 @@ export function Hero() {
                 <Play className="h-4 w-4" />
                 Voir la démo
               </a>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Mockup du tableau collaboratif */}
-          <div className="relative">
+          <motion.div
+            className="relative"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
+          >
             <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
               {/* barre d'outils */}
               <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-3">
@@ -159,11 +200,16 @@ export function Hero() {
               </div>
             </div>
 
-            {/* cartes flottantes décoratives */}
-            <div className="absolute -right-3 -top-3 hidden rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium shadow-sm sm:block">
+            {/* carte flottante décorative */}
+            <motion.div
+              className="absolute -right-3 -top-3 hidden rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium shadow-sm sm:block"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut', delay: 0.6 }}
+            >
               +3 personnes connectées
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
     </section>
