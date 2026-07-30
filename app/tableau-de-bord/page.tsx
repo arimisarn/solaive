@@ -1,25 +1,53 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, PenLine, Users, StickyNote } from 'lucide-react';
+import { LogOut, PenLine, Users, StickyNote, Loader2 } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { createClient } from '@/lib/supabase/clients';
+import { toast } from 'sonner';
 
 const ACTIONS = [
-  { icon: PenLine, label: 'Nouveau tableau', href: '#' },
-  { icon: Users, label: 'Inviter un collaborateur', href: '#' },
-  { icon: StickyNote, label: 'Ouvrir un brouillon', href: '#' },
+  { icon: Users, label: 'Inviter un collaborateur' },
+  { icon: StickyNote, label: 'Ouvrir un brouillon' },
 ];
 
 export default function TableauDeBordPage() {
   const router = useRouter();
   const supabase = createClient();
+  const [creating, setCreating] = useState(false);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/connexion');
     router.refresh();
+  }
+
+  async function handleNewBoard() {
+    setCreating(true);
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setCreating(false);
+      router.push('/connexion');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('tableaux')
+      .insert({ owner_id: userData.user.id })
+      .select('id')
+      .single();
+
+    setCreating(false);
+
+    if (error || !data) {
+      toast.error("Impossible de créer le tableau. Réessaie.");
+      return;
+    }
+
+    router.push(`/tableau/${data.id}`);
   }
 
   return (
@@ -54,12 +82,28 @@ export default function TableauDeBordPage() {
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={handleNewBoard}
+            disabled={creating}
+            className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm disabled:opacity-60"
+            style={{ animationDelay: '0.1s' }}
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <PenLine className="h-5 w-5" />}
+            </span>
+            <span className="text-sm font-medium text-foreground">
+              {creating ? 'Création…' : 'Nouveau tableau'}
+            </span>
+          </button>
+
           {ACTIONS.map((action, i) => (
             <button
               key={action.label}
               type="button"
-              className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
-              style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+              disabled
+              className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left opacity-50 cursor-not-allowed"
+              style={{ animationDelay: `${0.18 + i * 0.08}s` }}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
                 <action.icon className="h-5 w-5" />
