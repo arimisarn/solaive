@@ -69,19 +69,16 @@ export default function TableauPage() {
         [userInfo]
     );
 
-    const store = useSync({
-        uri: `ws://localhost:5858/connect/${id}`,
-        assets: inlineBase64AssetStore, // provisoire, on branchera un vrai stockage plus tard
-        users: { currentUser },
-    });
-
-    if (status === 'checking') {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-6 w-6 animate-spin text-accent" />
-            </div>
-        );
-    }
+    const store = useSync(
+        useMemo(
+            () => ({
+                uri: `ws://localhost:5858/connect/${id}`,
+                assets: inlineBase64AssetStore,
+                users: { currentUser },
+            }),
+            [id, currentUser]
+        )
+    );
 
     if (status === 'not-found') {
         return (

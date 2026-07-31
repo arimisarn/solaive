@@ -3,12 +3,12 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev",
+        "dev": "concurrently -n next,sync -c blue,magenta \"next dev\" \"npm run dev:sync\"",
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
         "typecheck": "tsc --noEmit",
-        "dev:sync": "tsx watch server/index.ts"
+        "dev:sync": "tsx watch --env-file=.env.local server/index.ts"
     },
     "dependencies": {
         "@fontsource/inter": "^5.3.0",
@@ -83,6 +83,7 @@
     },
     "devDependencies": {
         "@types/ws": "^8.18.1",
+        "concurrently": "^10.0.4",
         "tsx": "^4.23.1"
     }
 }
