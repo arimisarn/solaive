@@ -5,6 +5,7 @@ import { createTLSchema, type TLRecord } from '@tldraw/tlschema';
 import { createClient } from '@supabase/supabase-js';
 
 const PORT = 5858;
+const SAVE_INTERVAL_MS = 20_000;
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +32,7 @@ async function saveSnapshot(roomId: string, snapshot: RoomSnapshot) {
 }
 
 const rooms = new Map<string, TLSocketRoom<TLRecord>>();
+const saveIntervals = new Map<string, NodeJS.Timeout>();
 
 async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
     let room = rooms.get(roomId);
@@ -43,6 +45,11 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             onSessionRemoved: (r, { numSessionsRemaining }) => {
                 if (numSessionsRemaining === 0) {
                     console.log(`Room ${roomId} vide, sauvegarde puis fermeture.`);
+                    const interval = saveIntervals.get(roomId);
+                    if (interval) {
+                        clearInterval(interval);
+                        saveIntervals.delete(roomId);
+                    }
                     saveSnapshot(roomId, r.getCurrentSnapshot()).finally(() => {
                         r.close();
                         rooms.delete(roomId);
@@ -51,6 +58,17 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             },
         });
         rooms.set(roomId, room);
+
+        const interval = setInterval(() => {
+            const currentRoom = rooms.get(roomId);
+            if (!currentRoom) {
+                clearInterval(interval);
+                saveIntervals.delete(roomId);
+                return;
+            }
+            saveSnapshot(roomId, currentRoom.getCurrentSnapshot());
+        }, SAVE_INTERVAL_MS);
+        saveIntervals.set(roomId, interval);
     }
     return room;
 }
