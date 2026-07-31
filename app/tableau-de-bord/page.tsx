@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, PenLine, Users, StickyNote, Loader2 } from 'lucide-react';
+import { LogOut, PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { createClient } from '@/lib/supabase/clients';
 import { toast } from 'sonner';
@@ -13,10 +13,51 @@ const ACTIONS = [
   { icon: StickyNote, label: 'Ouvrir un brouillon' },
 ];
 
+type Tableau = {
+  id: string;
+  created_at: string | null;
+};
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export default function TableauDeBordPage() {
   const router = useRouter();
   const supabase = createClient();
   const [creating, setCreating] = useState(false);
+  const [tableaux, setTableaux] = useState<Tableau[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+
+  useEffect(() => {
+    async function loadTableaux() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        router.push('/connexion');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('tableaux')
+        .select('id, created_at')
+        .eq('owner_id', userData.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        toast.error('Impossible de charger tes tableaux.');
+      } else {
+        setTableaux(data ?? []);
+      }
+      setLoadingList(false);
+    }
+
+    loadTableaux();
+  }, [router, supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -113,6 +154,47 @@ export default function TableauDeBordPage() {
               </span>
             </button>
           ))}
+        </div>
+
+        <div className="mt-12">
+          <h2 className="font-heading text-xl font-bold text-foreground">
+            Tes tableaux
+          </h2>
+
+          {loadingList ? (
+            <div className="mt-6 flex items-center gap-2 text-foreground/60">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement…
+            </div>
+          ) : tableaux.length === 0 ? (
+            <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
+              <LayoutGrid className="h-6 w-6 text-foreground/40" />
+              <p className="text-sm text-foreground/60">
+                Tu n'as pas encore de tableau. Crée le premier ci-dessus.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {tableaux.map((t, i) => (
+                <Link
+                  key={t.id}
+                  href={`/tableau/${t.id}`}
+                  className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
+                  style={{ animationDelay: `${i * 0.05}s` }}
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <PenLine className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm font-medium text-foreground">
+                    Tableau du {formatDate(t.created_at)}
+                  </span>
+                  <span className="text-xs text-foreground/50">
+                    {t.id.slice(0, 8)}…
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>
