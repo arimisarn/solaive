@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarBadge,
   SidebarTrigger,
-} from '@/components/ui/sidebar';
+} from '@/components/ui/sidebar-ui';
 
 export function AppSidebar({ onInvitationResolved }: { onInvitationResolved?: () => void }) {
   const router = useRouter();

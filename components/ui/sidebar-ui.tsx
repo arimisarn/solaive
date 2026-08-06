@@ -91,19 +91,21 @@ export function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={value}>
-      <div
-        style={
-          {
-            '--sidebar-width': SIDEBAR_WIDTH,
-            '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
-            ...style,
-          } as React.CSSProperties
-        }
-        className={cn('flex min-h-screen w-full', className)}
-        {...props}
-      >
-        {children}
-      </div>
+      <TooltipProvider delayDuration={0}>
+        <div
+          style={
+            {
+              '--sidebar-width': SIDEBAR_WIDTH,
+              '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
+              ...style,
+            } as React.CSSProperties
+          }
+          className={cn('flex min-h-screen w-full', className)}
+          {...props}
+        >
+          {children}
+        </div>
+      </TooltipProvider>
     </SidebarContext.Provider>
   );
 }
@@ -254,5 +256,3 @@ export function SidebarBadge({ className, ...props }: React.ComponentProps<'span
     />
   );
 }
-
-export { TooltipProvider as SidebarTooltipProvider };
