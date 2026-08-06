@@ -16,6 +16,13 @@ type Collaborateur = {
     user_id: string;
     email: string;
     created_at: string;
+    statut: 'en_attente' | 'acceptee' | 'refusee';
+};
+
+const STATUT_LABELS: Record<Collaborateur['statut'], { label: string; className: string }> = {
+    en_attente: { label: 'En attente', className: 'bg-amber-100 text-amber-700' },
+    acceptee: { label: 'Accepté', className: 'bg-emerald-100 text-emerald-700' },
+    refusee: { label: 'Refusé', className: 'bg-red-100 text-red-600' },
 };
 
 export function ShareDialog({
@@ -68,7 +75,7 @@ export function ShareDialog({
             return;
         }
 
-        toast.success(`${email.trim()} a été ajouté au tableau.`);
+        toast.success(`Invitation envoyée à ${email.trim()}.`);
         setEmail('');
         loadCollaborateurs();
     }
@@ -152,7 +159,14 @@ export function ShareDialog({
                                     key={c.user_id}
                                     className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm"
                                 >
-                                    <span className="truncate text-foreground/80">{c.email}</span>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="truncate text-foreground/80">{c.email}</span>
+                                        <span
+                                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUT_LABELS[c.statut].className}`}
+                                        >
+                                            {STATUT_LABELS[c.statut].label}
+                                        </span>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => handleRemove(c.user_id)}

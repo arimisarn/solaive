@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
+import { PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { ShareDialog } from '@/components/ShareDialog';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar-ui';
 import { createClient } from '@/lib/supabase/clients';
 import { toast } from 'sonner';
 
@@ -37,40 +39,34 @@ export default function TableauDeBordPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadTableaux() {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        router.push('/connexion');
-        return;
-      }
-
-      setUserId(userData.user.id);
-
-      // Pas de filtre .eq('owner_id', ...) ici : la policy RLS "tableaux: lecture"
-      // renvoie maintenant à la fois les tableaux possédés ET ceux partagés avec
-      // l'utilisateur via tableau_membres.
-      const { data, error } = await supabase
-        .from('tableaux')
-        .select('id, created_at, owner_id')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        toast.error('Impossible de charger tes tableaux.');
-      } else {
-        setTableaux(data ?? []);
-      }
-      setLoadingList(false);
+  const loadTableaux = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      router.push('/connexion');
+      return;
     }
 
-    loadTableaux();
+    setUserId(userData.user.id);
+
+    // Pas de filtre .eq('owner_id', ...) ici : la policy RLS "tableaux: lecture"
+    // renvoie maintenant à la fois les tableaux possédés ET ceux partagés avec
+    // l'utilisateur (une fois l'invitation acceptée) via tableau_membres.
+    const { data, error } = await supabase
+      .from('tableaux')
+      .select('id, created_at, owner_id')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Impossible de charger tes tableaux.');
+    } else {
+      setTableaux(data ?? []);
+    }
+    setLoadingList(false);
   }, [router, supabase]);
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push('/connexion');
-    router.refresh();
-  }
+  useEffect(() => {
+    loadTableaux();
+  }, [loadTableaux]);
 
   async function handleNewBoard() {
     setCreating(true);
@@ -99,126 +95,116 @@ export default function TableauDeBordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <EmailVerificationBanner />
-      <header className="border-b border-border/60 bg-card">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="font-heading text-xl font-bold text-accent">
-            Solaive
-          </Link>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <LogOut className="h-4 w-4" />
-              Déconnexion
-            </button>
+    <SidebarProvider>
+      <AppSidebar onInvitationResolved={loadTableaux} />
+      <SidebarInset>
+        <EmailVerificationBanner />
+        <header className="flex h-16 items-center gap-3 border-b border-border/60 bg-card px-4 sm:px-6 lg:px-8">
+          <SidebarTrigger className="md:hidden" />
+          <span className="font-heading text-lg font-semibold text-foreground">Vos tableaux</span>
+        </header>
+
+        <main className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="animate-fade-up">
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
+              Vos tableaux
+            </h1>
+            <p className="mt-2 text-foreground/60">
+              Choisissez une action pour démarrer.
+            </p>
           </div>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="animate-fade-up">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
-            Vos tableaux
-          </h1>
-          <p className="mt-2 text-foreground/60">
-            Choisissez une action pour démarrer.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          <button
-            type="button"
-            onClick={handleNewBoard}
-            disabled={creating}
-            className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm disabled:opacity-60"
-            style={{ animationDelay: '0.1s' }}
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <PenLine className="h-5 w-5" />}
-            </span>
-            <span className="text-sm font-medium text-foreground">
-              {creating ? 'Création…' : 'Nouveau tableau'}
-            </span>
-          </button>
-
-          {ACTIONS.map((action, i) => (
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
             <button
-              key={action.label}
               type="button"
-              disabled
-              className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left opacity-50 cursor-not-allowed"
-              style={{ animationDelay: `${0.18 + i * 0.08}s` }}
+              onClick={handleNewBoard}
+              disabled={creating}
+              className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm disabled:opacity-60"
+              style={{ animationDelay: '0.1s' }}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                <action.icon className="h-5 w-5" />
+                {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <PenLine className="h-5 w-5" />}
               </span>
               <span className="text-sm font-medium text-foreground">
-                {action.label}
+                {creating ? 'Création…' : 'Nouveau tableau'}
               </span>
             </button>
-          ))}
-        </div>
 
-        <div className="mt-12">
-          <h2 className="font-heading text-xl font-bold text-foreground">
-            Tes tableaux
-          </h2>
+            {ACTIONS.map((action, i) => (
+              <button
+                key={action.label}
+                type="button"
+                disabled
+                className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left opacity-50 cursor-not-allowed"
+                style={{ animationDelay: `${0.18 + i * 0.08}s` }}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                  <action.icon className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium text-foreground">
+                  {action.label}
+                </span>
+              </button>
+            ))}
+          </div>
 
-          {loadingList ? (
-            <div className="mt-6 flex items-center gap-2 text-foreground/60">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Chargement…
-            </div>
-          ) : tableaux.length === 0 ? (
-            <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
-              <LayoutGrid className="h-6 w-6 text-foreground/40" />
-              <p className="text-sm text-foreground/60">
-                Tu n'as pas encore de tableau. Crée le premier ci-dessus.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tableaux.map((t, i) => {
-                const isOwner = t.owner_id === userId;
-                return (
-                  <div
-                    key={t.id}
-                    className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
-                    style={{ animationDelay: `${i * 0.05}s` }}
-                  >
-                    <Link href={`/tableau/${t.id}`} className="flex flex-col gap-2">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                        <PenLine className="h-5 w-5" />
-                      </span>
-                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        Tableau du {formatDate(t.created_at)}
-                        {!isOwner && (
-                          <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
-                            Partagé
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-foreground/50">
-                        {t.id.slice(0, 8)}…
-                      </span>
-                    </Link>
+          <div className="mt-12">
+            <h2 className="font-heading text-xl font-bold text-foreground">
+              Tes tableaux
+            </h2>
 
-                    {isOwner && (
-                      <div className="mt-1 flex justify-end">
-                        <ShareDialog tableauId={t.id} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+            {loadingList ? (
+              <div className="mt-6 flex items-center gap-2 text-foreground/60">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Chargement…
+              </div>
+            ) : tableaux.length === 0 ? (
+              <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
+                <LayoutGrid className="h-6 w-6 text-foreground/40" />
+                <p className="text-sm text-foreground/60">
+                  Tu n'as pas encore de tableau. Crée le premier ci-dessus.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {tableaux.map((t, i) => {
+                  const isOwner = t.owner_id === userId;
+                  return (
+                    <div
+                      key={t.id}
+                      className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
+                      style={{ animationDelay: `${i * 0.05}s` }}
+                    >
+                      <Link href={`/tableau/${t.id}`} className="flex flex-col gap-2">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                          <PenLine className="h-5 w-5" />
+                        </span>
+                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          Tableau du {formatDate(t.created_at)}
+                          {!isOwner && (
+                            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                              Partagé
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs text-foreground/50">
+                          {t.id.slice(0, 8)}…
+                        </span>
+                      </Link>
+
+                      {isOwner && (
+                        <div className="mt-1 flex justify-end">
+                          <ShareDialog tableauId={t.id} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

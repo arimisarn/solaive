@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const PORT = 5858;
 const SAVE_INTERVAL_MS = 20_000;
+// Délai de grâce avant de considérer une room vraiment vide : absorbe les
+// micro-déconnexions/reconnexions (Strict Mode en dev, refresh de page,
+// changement d'onglet bref) qui ne doivent PAS déclencher une fermeture
+// + sauvegarde prématurée d'un snapshot potentiellement incomplet.
+const EMPTY_ROOM_GRACE_MS = 10_000;
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +38,7 @@ async function saveSnapshot(roomId: string, snapshot: RoomSnapshot) {
 
 const rooms = new Map<string, TLSocketRoom<TLRecord>>();
 const saveIntervals = new Map<string, NodeJS.Timeout>();
+const closeTimers = new Map<string, NodeJS.Timeout>();
 
 async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
     let room = rooms.get(roomId);
@@ -44,16 +50,30 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             initialSnapshot,
             onSessionRemoved: (r, { numSessionsRemaining }) => {
                 if (numSessionsRemaining === 0) {
-                    console.log(`Room ${roomId} vide, sauvegarde puis fermeture.`);
-                    const interval = saveIntervals.get(roomId);
-                    if (interval) {
-                        clearInterval(interval);
-                        saveIntervals.delete(roomId);
-                    }
-                    saveSnapshot(roomId, r.getCurrentSnapshot()).finally(() => {
-                        r.close();
-                        rooms.delete(roomId);
-                    });
+                    console.log(`Room ${roomId} vide, fermeture programmée dans ${EMPTY_ROOM_GRACE_MS / 1000}s si personne ne revient.`);
+                    const existingTimer = closeTimers.get(roomId);
+                    if (existingTimer) clearTimeout(existingTimer);
+
+                    const timer = setTimeout(() => {
+                        closeTimers.delete(roomId);
+                        // Re-vérifie qu'aucune session n'est revenue entre-temps
+                        // (le compteur peut avoir changé pendant le délai de grâce).
+                        if (r.getNumActiveSessions() > 0) {
+                            console.log(`Room ${roomId} : quelqu'un est revenu, fermeture annulée.`);
+                            return;
+                        }
+                        console.log(`Room ${roomId} toujours vide après le délai, sauvegarde puis fermeture.`);
+                        const interval = saveIntervals.get(roomId);
+                        if (interval) {
+                            clearInterval(interval);
+                            saveIntervals.delete(roomId);
+                        }
+                        saveSnapshot(roomId, r.getCurrentSnapshot()).finally(() => {
+                            r.close();
+                            rooms.delete(roomId);
+                        });
+                    }, EMPTY_ROOM_GRACE_MS);
+                    closeTimers.set(roomId, timer);
                 }
             },
         });
@@ -69,6 +89,15 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             saveSnapshot(roomId, currentRoom.getCurrentSnapshot());
         }, SAVE_INTERVAL_MS);
         saveIntervals.set(roomId, interval);
+    } else {
+        // Une nouvelle session rejoint une room existante : annule toute
+        // fermeture programmée, la room n'est plus considérée comme vide.
+        const existingTimer = closeTimers.get(roomId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            closeTimers.delete(roomId);
+            console.log(`Room ${roomId} : nouvelle connexion, fermeture annulée.`);
+        }
     }
     return room;
 }
