@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
+import { ShareDialog } from '@/components/ShareDialog';
 import { createClient } from '@/lib/supabase/clients';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ const ACTIONS = [
 type Tableau = {
   id: string;
   created_at: string | null;
+  owner_id: string;
 };
 
 function formatDate(dateStr: string | null) {
@@ -33,6 +35,7 @@ export default function TableauDeBordPage() {
   const [creating, setCreating] = useState(false);
   const [tableaux, setTableaux] = useState<Tableau[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTableaux() {
@@ -42,10 +45,14 @@ export default function TableauDeBordPage() {
         return;
       }
 
+      setUserId(userData.user.id);
+
+      // Pas de filtre .eq('owner_id', ...) ici : la policy RLS "tableaux: lecture"
+      // renvoie maintenant à la fois les tableaux possédés ET ceux partagés avec
+      // l'utilisateur via tableau_membres.
       const { data, error } = await supabase
         .from('tableaux')
-        .select('id, created_at')
-        .eq('owner_id', userData.user.id)
+        .select('id, created_at, owner_id')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -175,24 +182,39 @@ export default function TableauDeBordPage() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tableaux.map((t, i) => (
-                <Link
-                  key={t.id}
-                  href={`/tableau/${t.id}`}
-                  className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
-                  style={{ animationDelay: `${i * 0.05}s` }}
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                    <PenLine className="h-5 w-5" />
-                  </span>
-                  <span className="text-sm font-medium text-foreground">
-                    Tableau du {formatDate(t.created_at)}
-                  </span>
-                  <span className="text-xs text-foreground/50">
-                    {t.id.slice(0, 8)}…
-                  </span>
-                </Link>
-              ))}
+              {tableaux.map((t, i) => {
+                const isOwner = t.owner_id === userId;
+                return (
+                  <div
+                    key={t.id}
+                    className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
+                    style={{ animationDelay: `${i * 0.05}s` }}
+                  >
+                    <Link href={`/tableau/${t.id}`} className="flex flex-col gap-2">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                        <PenLine className="h-5 w-5" />
+                      </span>
+                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        Tableau du {formatDate(t.created_at)}
+                        {!isOwner && (
+                          <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                            Partagé
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-foreground/50">
+                        {t.id.slice(0, 8)}…
+                      </span>
+                    </Link>
+
+                    {isOwner && (
+                      <div className="mt-1 flex justify-end">
+                        <ShareDialog tableauId={t.id} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

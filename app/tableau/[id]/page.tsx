@@ -7,6 +7,7 @@ import 'tldraw/tldraw.css';
 import { useSync } from '@tldraw/sync';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
+import { ShareDialog } from '@/components/ShareDialog';
 
 const CURSOR_COLORS = ['#7C3AED', '#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#EC4899'];
 
@@ -23,6 +24,7 @@ export default function TableauPage() {
 
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
+    const [isOwner, setIsOwner] = useState(false);
 
     useEffect(() => {
         async function checkAccess() {
@@ -37,11 +39,13 @@ export default function TableauPage() {
                 name: userData.user.email?.split('@')[0] ?? 'Utilisateur',
             });
 
+            // Pas de .eq('owner_id', ...) : la policy RLS "tableaux: lecture" laisse
+            // passer à la fois le owner et les membres invités via tableau_membres.
+            // Si la ligne n'existe pas ici, c'est que l'utilisateur n'a aucun accès.
             const { data, error } = await supabase
                 .from('tableaux')
-                .select('id')
+                .select('id, owner_id')
                 .eq('id', id)
-                .eq('owner_id', userData.user.id)
                 .maybeSingle();
 
             if (error || !data) {
@@ -49,6 +53,7 @@ export default function TableauPage() {
                 return;
             }
 
+            setIsOwner(data.owner_id === userData.user.id);
             setStatus('ok');
         }
 
@@ -98,6 +103,13 @@ export default function TableauPage() {
     return (
         <div className="fixed inset-0">
             <Tldraw store={store} />
+            {isOwner && (
+                <div className="pointer-events-none absolute right-3 top-3 z-[300]">
+                    <div className="pointer-events-auto">
+                        <ShareDialog tableauId={id} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
