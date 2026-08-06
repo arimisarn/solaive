@@ -96,7 +96,7 @@ export default function TableauDeBordPage() {
 
   return (
     <SidebarProvider>
-      <AppSidebar onInvitationResolved={loadTableaux} />
+      <AppSidebar />
       <SidebarInset>
         <EmailVerificationBanner />
         <header className="flex h-16 items-center gap-3 border-b border-border/60 bg-card px-4 sm:px-6 lg:px-8">

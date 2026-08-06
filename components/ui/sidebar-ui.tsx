@@ -135,7 +135,7 @@ export function Sidebar({
   return (
     <div
       className={cn(
-        'relative hidden shrink-0 border-border/60 bg-card text-foreground transition-[width] duration-200 ease-linear md:flex md:flex-col',
+        'relative hidden shrink-0 overflow-hidden border-border/60 bg-card text-foreground transition-[width] duration-200 ease-linear md:flex md:flex-col',
         side === 'left' ? 'border-r' : 'border-l',
         state === 'expanded' ? 'w-[var(--sidebar-width)]' : 'w-[var(--sidebar-width-icon)]',
         className
@@ -217,19 +217,22 @@ export function SidebarMenuButton({
 }) {
   const Comp = asChild ? Slot : 'button';
   const { state, isMobile } = useSidebar();
+  const collapsed = state === 'collapsed' && !isMobile;
 
   const button = (
     <Comp
       className={cn(
-        'flex h-9 w-full items-center gap-2 overflow-hidden rounded-lg px-2 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-accent/10 hover:text-accent',
+        'relative flex h-9 w-full items-center gap-2 overflow-hidden rounded-lg px-2 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-accent/10 hover:text-accent',
         isActive && 'bg-accent/10 text-accent',
+        collapsed &&
+        'justify-center px-0 [&_[data-sidebar=label]]:hidden [&_[data-sidebar=badge]]:absolute [&_[data-sidebar=badge]]:-right-0.5 [&_[data-sidebar=badge]]:-top-0.5 [&_[data-sidebar=badge]]:ml-0 [&_[data-sidebar=badge]]:h-3.5 [&_[data-sidebar=badge]]:min-w-3.5 [&_[data-sidebar=badge]]:px-0 [&_[data-sidebar=badge]]:text-[8px]',
         className
       )}
       {...props}
     />
   );
 
-  if (!tooltip || state !== 'collapsed' || isMobile) {
+  if (!tooltip || !collapsed) {
     return button;
   }
 
@@ -248,6 +251,7 @@ export function SidebarSeparator({ className, ...props }: React.ComponentProps<'
 export function SidebarBadge({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
+      data-sidebar="badge"
       className={cn(
         'ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-white',
         className
