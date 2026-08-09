@@ -39,13 +39,22 @@ async function saveSnapshot(roomId: string, snapshot: RoomSnapshot) {
 const rooms = new Map<string, TLSocketRoom<TLRecord>>();
 const saveIntervals = new Map<string, NodeJS.Timeout>();
 const closeTimers = new Map<string, NodeJS.Timeout>();
+// Empêche la race condition : si deux connexions arrivent pour le même
+// roomId pendant que loadSnapshot() est encore en vol (await), les deux
+// devaient auparavant créer chacune leur propre TLSocketRoom (rooms.get()
+// renvoie undefined pour les deux tant que la première création n'est pas
+// allée jusqu'au bout). La seconde écrasait la référence de la première
+// dans `rooms`, alors qu'un client restait connecté à la première room —
+// et sa sauvegarde périodique finissait par écraser les vraies données
+// avec un snapshot vide. On mémorise donc la PROMESSE de création elle-même :
+// tout appel concurrent attend la même création au lieu d'en lancer une autre.
+const roomCreationPromises = new Map<string, Promise<TLSocketRoom<TLRecord>>>();
 
-async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
-    let room = rooms.get(roomId);
-    if (!room) {
+function createRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
+    const creation = (async () => {
         const initialSnapshot = await loadSnapshot(roomId);
 
-        room = new TLSocketRoom({
+        const room = new TLSocketRoom({
             schema: createTLSchema(),
             initialSnapshot,
             onSessionRemoved: (r, { numSessionsRemaining }) => {
@@ -89,7 +98,23 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             saveSnapshot(roomId, currentRoom.getCurrentSnapshot());
         }, SAVE_INTERVAL_MS);
         saveIntervals.set(roomId, interval);
-    } else {
+
+        return room;
+    })();
+
+    // Une fois la création terminée (succès ou échec), on retire la promesse
+    // du cache : un futur appel après fermeture de la room doit pouvoir en
+    // recréer une nouvelle normalement.
+    creation.finally(() => {
+        roomCreationPromises.delete(roomId);
+    });
+
+    return creation;
+}
+
+async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
+    const existingRoom = rooms.get(roomId);
+    if (existingRoom) {
         // Une nouvelle session rejoint une room existante : annule toute
         // fermeture programmée, la room n'est plus considérée comme vide.
         const existingTimer = closeTimers.get(roomId);
@@ -98,8 +123,17 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
             closeTimers.delete(roomId);
             console.log(`Room ${roomId} : nouvelle connexion, fermeture annulée.`);
         }
+        return existingRoom;
     }
-    return room;
+
+    const inFlight = roomCreationPromises.get(roomId);
+    if (inFlight) {
+        return inFlight;
+    }
+
+    const creationPromise = createRoom(roomId);
+    roomCreationPromises.set(roomId, creationPromise);
+    return creationPromise;
 }
 
 const httpServer = createServer((req, res) => {
