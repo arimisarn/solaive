@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Tldraw, computed, createUserId, inlineBase64AssetStore, UserRecordType } from 'tldraw';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Tldraw, computed, createUserId, inlineBase64AssetStore, UserRecordType, type Editor } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { useSync } from '@tldraw/sync';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { ShareDialog } from '@/components/ShareDialog';
+import { applyTemplate, type TemplateId } from '@/lib/templates';
+
+const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
 
 const CURSOR_COLORS = ['#7C3AED', '#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#EC4899'];
 
@@ -20,11 +23,13 @@ function colorForUser(id: string) {
 export default function TableauPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = createClient();
 
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
     const [isOwner, setIsOwner] = useState(false);
+    const templateAppliedRef = useRef(false);
 
     useEffect(() => {
         async function checkAccess() {
@@ -85,6 +90,17 @@ export default function TableauPage() {
         )
     );
 
+    function handleMount(editor: Editor) {
+        if (templateAppliedRef.current) return;
+
+        const templateParam = searchParams.get('template');
+        if (!templateParam || !VALID_TEMPLATE_IDS.includes(templateParam as TemplateId)) return;
+
+        templateAppliedRef.current = true;
+        applyTemplate(editor, templateParam as TemplateId);
+        router.replace(`/tableau/${id}`);
+    }
+
     if (status === 'not-found') {
         return (
             <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background">
@@ -102,7 +118,7 @@ export default function TableauPage() {
 
     return (
         <div className="fixed inset-0">
-            <Tldraw store={store} />
+            <Tldraw store={store} onMount={handleMount} />
             {isOwner && (
                 <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                     <div className="pointer-events-auto">

@@ -7,8 +7,10 @@ import { PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { ShareDialog } from '@/components/ShareDialog';
 import { AppSidebar } from '@/components/AppSidebar';
+import { TemplatePickerDialog } from '@/components/TemplatePickerDialog';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar-ui';
 import { createClient } from '@/lib/supabase/clients';
+import type { TemplateId } from '@/lib/templates';
 import { toast } from 'sonner';
 
 const ACTIONS = [
@@ -68,7 +70,10 @@ export default function TableauDeBordPage() {
     loadTableaux();
   }, [loadTableaux]);
 
-  async function handleNewBoard() {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  async function createBoard(templateId: TemplateId | null) {
+    setPickerOpen(false);
     setCreating(true);
 
     const { data: userData } = await supabase.auth.getUser();
@@ -91,7 +96,7 @@ export default function TableauDeBordPage() {
       return;
     }
 
-    router.push(`/tableau/${data.id}`);
+    router.push(templateId ? `/tableau/${data.id}?template=${templateId}` : `/tableau/${data.id}`);
   }
 
   return (
@@ -117,7 +122,7 @@ export default function TableauDeBordPage() {
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             <button
               type="button"
-              onClick={handleNewBoard}
+              onClick={() => setPickerOpen(true)}
               disabled={creating}
               className="flex animate-fade-up items-center gap-3 rounded-xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm disabled:opacity-60"
               style={{ animationDelay: '0.1s' }}
@@ -129,6 +134,8 @@ export default function TableauDeBordPage() {
                 {creating ? 'Création…' : 'Nouveau tableau'}
               </span>
             </button>
+
+            <TemplatePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelect={createBoard} />
 
             {ACTIONS.map((action, i) => (
               <button
