@@ -11,6 +11,7 @@ import { ShareDialog } from '@/components/ShareDialog';
 import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { ExportBoardMenu } from '@/components/ExportBoardMenu';
 import { ChatPanel } from '@/components/ChatPanel';
+import { VersionHistoryPanel } from '@/components/VersionHistoryPanel';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -35,6 +36,9 @@ export default function TableauPage() {
     const [titre, setTitre] = useState<string | null>(null);
     const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
     const templateAppliedRef = useRef(false);
+    // Chat et historique des versions partagent le même emplacement de panneau
+    // flottant (bas-droite) : un seul des deux peut être ouvert à la fois.
+    const [activePanel, setActivePanel] = useState<'chat' | 'versions' | null>(null);
 
     useEffect(() => {
         async function checkAccess() {
@@ -151,7 +155,18 @@ export default function TableauPage() {
             <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                 <div className="pointer-events-auto flex items-center gap-2">
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
-                    <ChatPanel tableauId={id} userId={userInfo.id} userName={userInfo.name} />
+                    <VersionHistoryPanel
+                        tableauId={id}
+                        open={activePanel === 'versions'}
+                        onOpenChange={(next) => setActivePanel(next ? 'versions' : null)}
+                    />
+                    <ChatPanel
+                        tableauId={id}
+                        userId={userInfo.id}
+                        userName={userInfo.name}
+                        open={activePanel === 'chat'}
+                        onOpenChange={(next) => setActivePanel(next ? 'chat' : null)}
+                    />
                     {isOwner && (
                         <>
                             <DeleteBoardDialog
@@ -175,4 +190,4 @@ export default function TableauPage() {
             </div>
         </div>
     );
-}
+}   

@@ -19,13 +19,17 @@ export function ChatPanel({
     tableauId,
     userId,
     userName,
+    open,
+    onOpenChange,
 }: {
     tableauId: string;
     userId: string;
     userName: string;
+    /** Ouverture contrôlée par le parent, pour rester exclusif avec d'autres panneaux flottants (ex. historique des versions). */
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
 }) {
     const supabase = createClient();
-    const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -98,7 +102,7 @@ export function ChatPanel({
     }, [messages, open]);
 
     function handleToggle() {
-        setOpen((prev) => !prev);
+        onOpenChange(!open);
         setUnreadCount(0);
     }
 
@@ -157,7 +161,7 @@ export function ChatPanel({
                         <p className="font-heading text-sm font-medium text-foreground">Chat</p>
                         <button
                             type="button"
-                            onClick={() => setOpen(false)}
+                            onClick={() => onOpenChange(false)}
                             className="text-foreground/40 hover:text-foreground/70"
                             aria-label="Fermer le chat"
                         >
@@ -187,11 +191,10 @@ export function ChatPanel({
                                             {isSelf ? 'Toi' : m.auteur_nom}
                                         </span>
                                         <div
-                                            className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm ${
-                                                isSelf
+                                            className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-sm ${isSelf
                                                     ? 'bg-accent text-white'
                                                     : 'bg-background text-foreground/90 border border-border/60'
-                                            }`}
+                                                }`}
                                         >
                                             {m.contenu}
                                         </div>
