@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { LayoutDashboard, LogOut, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { useInvitationsCount } from '@/components/InvitationsList';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Sidebar,
   SidebarContent,
@@ -79,9 +80,18 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        {!collapsed && email && (
-          <div className="truncate px-2 text-xs text-foreground/50" title={email}>
-            Connecté en tant que <span className="font-medium text-foreground/70">{email}</span>
+        {email && (
+          <div className={collapsed ? 'flex justify-center' : 'flex items-center gap-2 px-1'}>
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback className="bg-accent text-xs font-semibold text-white">
+                {email.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {!collapsed && (
+              <span className="min-w-0 truncate text-xs text-foreground/60" title={email}>
+                {email}
+              </span>
+            )}
           </div>
         )}
         <SidebarMenu>
