@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LayoutDashboard, LogOut, Bell } from 'lucide-react';
@@ -25,6 +26,13 @@ export function AppSidebar() {
   const invitationsCount = useInvitationsCount();
   const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed' && !isMobile;
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setEmail(data.user?.email ?? null);
+    });
+  }, [supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -71,6 +79,11 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {!collapsed && email && (
+          <div className="truncate px-2 text-xs text-foreground/50" title={email}>
+            Connecté en tant que <span className="font-medium text-foreground/70">{email}</span>
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Déconnexion">

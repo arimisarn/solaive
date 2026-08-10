@@ -135,7 +135,7 @@ export function Sidebar({
   return (
     <div
       className={cn(
-        'relative hidden shrink-0 overflow-hidden border-border/60 bg-card text-foreground transition-[width] duration-200 ease-linear md:flex md:flex-col',
+        'sticky top-0 hidden h-screen shrink-0 overflow-hidden border-border/60 bg-card text-foreground transition-[width] duration-200 ease-linear md:flex md:flex-col',
         side === 'left' ? 'border-r' : 'border-l',
         state === 'expanded' ? 'w-[var(--sidebar-width)]' : 'w-[var(--sidebar-width-icon)]',
         className
