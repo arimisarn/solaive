@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { ShareDialog } from '@/components/ShareDialog';
+import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { AppSidebar } from '@/components/AppSidebar';
 import { TemplatePickerDialog } from '@/components/TemplatePickerDialog';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar-ui';
@@ -201,7 +202,14 @@ export default function TableauDeBordPage() {
                       </Link>
 
                       {isOwner && (
-                        <div className="mt-1 flex justify-end">
+                        <div className="mt-1 flex items-center justify-end gap-1">
+                          <DeleteBoardDialog
+                            tableauId={t.id}
+                            titre={t.titre || `Tableau du ${formatDate(t.created_at)}`}
+                            onDeleted={() =>
+                              setTableaux((prev) => prev.filter((x) => x.id !== t.id))
+                            }
+                          />
                           <ShareDialog tableauId={t.id} />
                         </div>
                       )}

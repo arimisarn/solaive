@@ -5,9 +5,10 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Tldraw, computed, createUserId, inlineBase64AssetStore, UserRecordType, type Editor } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { useSync } from '@tldraw/sync';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { ShareDialog } from '@/components/ShareDialog';
+import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -144,7 +145,21 @@ export default function TableauPage() {
             )}
             {isOwner && (
                 <div className="pointer-events-none absolute right-3 top-3 z-[300]">
-                    <div className="pointer-events-auto">
+                    <div className="pointer-events-auto flex items-center gap-2">
+                        <DeleteBoardDialog
+                            tableauId={id}
+                            titre={titre}
+                            onDeleted={() => router.push('/tableau-de-bord')}
+                            trigger={
+                                <button
+                                    type="button"
+                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-foreground/60 shadow-sm backdrop-blur-sm transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
+                                    title="Supprimer le tableau"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            }
+                        />
                         <ShareDialog tableauId={id} />
                     </div>
                 </div>
