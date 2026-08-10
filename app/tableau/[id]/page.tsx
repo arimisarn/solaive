@@ -9,6 +9,7 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { ShareDialog } from '@/components/ShareDialog';
 import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
+import { ExportBoardMenu } from '@/components/ExportBoardMenu';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -31,6 +32,7 @@ export default function TableauPage() {
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
     const [isOwner, setIsOwner] = useState(false);
     const [titre, setTitre] = useState<string | null>(null);
+    const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
     const templateAppliedRef = useRef(false);
 
     useEffect(() => {
@@ -94,6 +96,8 @@ export default function TableauPage() {
     );
 
     function handleMount(editor: Editor) {
+        setEditorInstance(editor);
+
         if (templateAppliedRef.current) return;
 
         const templateParam = searchParams.get('template');
@@ -143,27 +147,30 @@ export default function TableauPage() {
                     </div>
                 </div>
             )}
-            {isOwner && (
-                <div className="pointer-events-none absolute right-3 top-3 z-[300]">
-                    <div className="pointer-events-auto flex items-center gap-2">
-                        <DeleteBoardDialog
-                            tableauId={id}
-                            titre={titre}
-                            onDeleted={() => router.push('/tableau-de-bord')}
-                            trigger={
-                                <button
-                                    type="button"
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-foreground/60 shadow-sm backdrop-blur-sm transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
-                                    title="Supprimer le tableau"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            }
-                        />
-                        <ShareDialog tableauId={id} />
-                    </div>
+            <div className="pointer-events-none absolute right-3 top-3 z-[300]">
+                <div className="pointer-events-auto flex items-center gap-2">
+                    <ExportBoardMenu editor={editorInstance} titre={titre} />
+                    {isOwner && (
+                        <>
+                            <DeleteBoardDialog
+                                tableauId={id}
+                                titre={titre}
+                                onDeleted={() => router.push('/tableau-de-bord')}
+                                trigger={
+                                    <button
+                                        type="button"
+                                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-foreground/60 shadow-sm backdrop-blur-sm transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
+                                        title="Supprimer le tableau"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                }
+                            />
+                            <ShareDialog tableauId={id} />
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
