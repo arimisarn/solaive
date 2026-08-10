@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/clients';
 import { ShareDialog } from '@/components/ShareDialog';
 import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { ExportBoardMenu } from '@/components/ExportBoardMenu';
+import { ChatPanel } from '@/components/ChatPanel';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -150,6 +151,7 @@ export default function TableauPage() {
             <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                 <div className="pointer-events-auto flex items-center gap-2">
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
+                    <ChatPanel tableauId={id} userId={userInfo.id} userName={userInfo.name} />
                     {isOwner && (
                         <>
                             <DeleteBoardDialog
