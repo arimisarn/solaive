@@ -45,7 +45,7 @@ const closeTimers = new Map<string, NodeJS.Timeout>();
 // renvoie undefined pour les deux tant que la première création n'est pas
 // allée jusqu'au bout). La seconde écrasait la référence de la première
 // dans `rooms`, alors qu'un client restait connecté à la première room —
-// et sa sauvegarde périodique finissait par écraser les vraies données
+// et son sauvegarde périodique finissait par écraser les vraies données
 // avec un snapshot vide. On mémorise donc la PROMESSE de création elle-même :
 // tout appel concurrent attend la même création au lieu d'en lancer une autre.
 const roomCreationPromises = new Map<string, Promise<TLSocketRoom<TLRecord>>>();

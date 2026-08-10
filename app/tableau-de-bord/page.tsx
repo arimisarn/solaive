@@ -22,6 +22,7 @@ type Tableau = {
   id: string;
   created_at: string | null;
   owner_id: string;
+  titre: string | null;
 };
 
 function formatDate(dateStr: string | null) {
@@ -55,7 +56,7 @@ export default function TableauDeBordPage() {
     // l'utilisateur (une fois l'invitation acceptée) via tableau_membres.
     const { data, error } = await supabase
       .from('tableaux')
-      .select('id, created_at, owner_id')
+      .select('id, created_at, owner_id, titre')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -72,7 +73,7 @@ export default function TableauDeBordPage() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function createBoard(templateId: TemplateId | null) {
+  async function createBoard(templateId: TemplateId | null, titre: string) {
     setPickerOpen(false);
     setCreating(true);
 
@@ -85,7 +86,7 @@ export default function TableauDeBordPage() {
 
     const { data, error } = await supabase
       .from('tableaux')
-      .insert({ owner_id: userData.user.id })
+      .insert({ owner_id: userData.user.id, titre })
       .select('id')
       .single();
 
@@ -187,7 +188,7 @@ export default function TableauDeBordPage() {
                           <PenLine className="h-5 w-5" />
                         </span>
                         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          Tableau du {formatDate(t.created_at)}
+                          {t.titre || `Tableau du ${formatDate(t.created_at)}`}
                           {!isOwner && (
                             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
                               Partagé
@@ -195,7 +196,7 @@ export default function TableauDeBordPage() {
                           )}
                         </span>
                         <span className="text-xs text-foreground/50">
-                          {t.id.slice(0, 8)}…
+                          {formatDate(t.created_at)}
                         </span>
                       </Link>
 

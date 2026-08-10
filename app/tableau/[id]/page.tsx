@@ -29,6 +29,7 @@ export default function TableauPage() {
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
     const [isOwner, setIsOwner] = useState(false);
+    const [titre, setTitre] = useState<string | null>(null);
     const templateAppliedRef = useRef(false);
 
     useEffect(() => {
@@ -49,7 +50,7 @@ export default function TableauPage() {
             // Si la ligne n'existe pas ici, c'est que l'utilisateur n'a aucun accès.
             const { data, error } = await supabase
                 .from('tableaux')
-                .select('id, owner_id')
+                .select('id, owner_id, titre')
                 .eq('id', id)
                 .maybeSingle();
 
@@ -59,6 +60,7 @@ export default function TableauPage() {
             }
 
             setIsOwner(data.owner_id === userData.user.id);
+            setTitre(data.titre);
             setStatus('ok');
         }
 
@@ -116,9 +118,30 @@ export default function TableauPage() {
         );
     }
 
+    // IMPORTANT : on ne monte <Tldraw> qu'une fois l'utilisateur connu (status === 'ok').
+    // Sinon `currentUser`/`store` sont d'abord créés avec userInfo=null, puis recréés
+    // dès que checkAccess() résout -> useSync() se reconnecte de zéro et un éventuel
+    // éditeur/template appliqué sur la première connexion (provisoire) est perdu avant
+    // d'avoir pu être flushé sur le websocket. C'était la cause du template qui
+    // disparaissait au reload et du crash "AtomMap: key [object Object] not found".
+    if (status === 'checking' || !userInfo) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0">
             <Tldraw store={store} onMount={handleMount} />
+            {titre && (
+                <div className="pointer-events-none absolute left-3 top-3 z-[300]">
+                    <div className="rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
+                        {titre}
+                    </div>
+                </div>
+            )}
             {isOwner && (
                 <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                     <div className="pointer-events-auto">
