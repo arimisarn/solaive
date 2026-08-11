@@ -18,6 +18,7 @@ import { ReactionButton } from '@/components/ReactionButton';
 import { ReactionBursts } from '@/components/ReactionBursts';
 import { TimerButton } from '@/components/TimerButton';
 import { PresentationButton } from '@/components/PresentationButton';
+import { PollButton } from '@/components/PollButton';
 import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
 import { useReactions } from '@/hooks/use-reactions';
 import { useTableauPresentation } from '@/hooks/use-tableau-presentation';
@@ -226,6 +227,7 @@ export default function TableauPage() {
                         onStop={() => presentationApi.stop()}
                     />
                     <TimerButton tableauId={id} />
+                    <PollButton tableauId={id} userId={userInfo.id} isOwner={isOwner} />
                     <ReactionButton editor={editorInstance} onReact={reactionsApi.sendReaction} />
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
                     <VersionHistoryPanel
