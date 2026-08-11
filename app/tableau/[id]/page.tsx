@@ -12,6 +12,9 @@ import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { ExportBoardMenu } from '@/components/ExportBoardMenu';
 import { ChatPanel } from '@/components/ChatPanel';
 import { VersionHistoryPanel } from '@/components/VersionHistoryPanel';
+import { CommentsPanel } from '@/components/CommentsPanel';
+import { CommentPins } from '@/components/CommentPins';
+import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -36,9 +39,13 @@ export default function TableauPage() {
     const [titre, setTitre] = useState<string | null>(null);
     const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
     const templateAppliedRef = useRef(false);
-    // Chat et historique des versions partagent le même emplacement de panneau
-    // flottant (bas-droite) : un seul des deux peut être ouvert à la fois.
-    const [activePanel, setActivePanel] = useState<'chat' | 'versions' | null>(null);
+    // Chat, historique des versions et commentaires partagent le même
+    // emplacement de panneau flottant (bas-droite) : un seul à la fois.
+    const [activePanel, setActivePanel] = useState<'chat' | 'versions' | 'comments' | null>(null);
+    // Mode "placement" : le prochain clic sur le canvas crée un nouveau pin de commentaire.
+    const [commentPlacing, setCommentPlacing] = useState(false);
+    // Fil de commentaire actuellement affiché en bulle flottante sur le canvas.
+    const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
     useEffect(() => {
         async function checkAccess() {
@@ -100,6 +107,25 @@ export default function TableauPage() {
         )
     );
 
+    const commentsApi = useTableauComments({
+        tableauId: id,
+        userId: userInfo?.id ?? '',
+        userName: userInfo?.name ?? '',
+        isPanelOpen: activePanel === 'comments' || activeThreadId !== null,
+    });
+
+    // Centre la caméra sur l'ancre du fil (position de la forme si elle existe
+    // encore, sinon les coordonnées d'origine du commentaire) puis l'ouvre.
+    function focusThread(comment: Commentaire) {
+        if (editorInstance) {
+            const bounds = comment.shape_id ? editorInstance.getShapePageBounds(comment.shape_id) : null;
+            const point = bounds ? { x: bounds.x, y: bounds.y } : { x: comment.x, y: comment.y };
+            editorInstance.centerOnPoint(point, { animation: { duration: 200 } });
+        }
+        setActiveThreadId(comment.id);
+        setActivePanel(null);
+    }
+
     function handleMount(editor: Editor) {
         setEditorInstance(editor);
 
@@ -145,6 +171,21 @@ export default function TableauPage() {
     return (
         <div className="fixed inset-0">
             <Tldraw store={store} onMount={handleMount} />
+            <CommentPins
+                editor={editorInstance}
+                comments={commentsApi.comments}
+                participants={commentsApi.participants}
+                currentUserId={userInfo.id}
+                placing={commentPlacing}
+                onPlacingChange={setCommentPlacing}
+                activeThreadId={activeThreadId}
+                onOpenThread={setActiveThreadId}
+                onCreateRoot={commentsApi.addComment}
+                onReply={(parentId, contenu, mentions) => commentsApi.addReply({ parentId, contenu, mentions })}
+                onToggleResolved={commentsApi.toggleResolved}
+                onDelete={commentsApi.deleteComment}
+                showResolved
+            />
             {titre && (
                 <div className="pointer-events-none absolute left-3 top-3 z-[300]">
                     <div className="rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
@@ -159,6 +200,23 @@ export default function TableauPage() {
                         tableauId={id}
                         open={activePanel === 'versions'}
                         onOpenChange={(next) => setActivePanel(next ? 'versions' : null)}
+                    />
+                    <CommentsPanel
+                        comments={commentsApi.comments}
+                        loading={commentsApi.loading}
+                        unreadCount={commentsApi.unreadCount}
+                        open={activePanel === 'comments'}
+                        onOpenChange={(next) => {
+                            setActivePanel(next ? 'comments' : null);
+                            if (next) commentsApi.clearUnread();
+                        }}
+                        onStartPlacing={() => {
+                            setActivePanel(null);
+                            setActiveThreadId(null);
+                            setCommentPlacing(true);
+                        }}
+                        onSelectThread={focusThread}
+                        currentUserId={userInfo.id}
                     />
                     <ChatPanel
                         tableauId={id}
@@ -190,4 +248,4 @@ export default function TableauPage() {
             </div>
         </div>
     );
-}   
+}
