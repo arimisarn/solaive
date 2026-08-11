@@ -106,6 +106,12 @@ const config: Config = {
           from: { opacity: '0', transform: 'scale(0.96)' },
           to: { opacity: '1', transform: 'scale(1)' },
         },
+        'reaction-float': {
+          '0%': { opacity: '0', transform: 'translateY(0) scale(0.5)' },
+          '15%': { opacity: '1', transform: 'translateY(-10px) scale(1.15)' },
+          '30%': { opacity: '1', transform: 'translateY(-24px) scale(1)' },
+          '100%': { opacity: '0', transform: 'translateY(-90px) scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -117,6 +123,7 @@ const config: Config = {
         'fade-up': 'fade-up 0.5s ease-out both',
         'fade-down': 'fade-down 0.4s ease-out both',
         'scale-in': 'scale-in 0.3s ease-out both',
+        'reaction-float': 'reaction-float 1.6s ease-out forwards',
       },
     },
   },

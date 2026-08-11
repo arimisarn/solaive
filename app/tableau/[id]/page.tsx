@@ -14,7 +14,10 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { VersionHistoryPanel } from '@/components/VersionHistoryPanel';
 import { CommentsPanel } from '@/components/CommentsPanel';
 import { CommentPins } from '@/components/CommentPins';
+import { ReactionButton } from '@/components/ReactionButton';
+import { ReactionBursts } from '@/components/ReactionBursts';
 import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
+import { useReactions } from '@/hooks/use-reactions';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -114,6 +117,12 @@ export default function TableauPage() {
         isPanelOpen: activePanel === 'comments' || activeThreadId !== null,
     });
 
+    const reactionsApi = useReactions({
+        tableauId: id,
+        userId: userInfo?.id ?? '',
+        userName: userInfo?.name ?? '',
+    });
+
     // Centre la caméra sur l'ancre du fil (position de la forme si elle existe
     // encore, sinon les coordonnées d'origine du commentaire) puis l'ouvre.
     function focusThread(comment: Commentaire) {
@@ -186,6 +195,7 @@ export default function TableauPage() {
                 onDelete={commentsApi.deleteComment}
                 showResolved
             />
+            <ReactionBursts editor={editorInstance} bursts={reactionsApi.bursts} />
             {titre && (
                 <div className="pointer-events-none absolute left-3 top-3 z-[300]">
                     <div className="rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
@@ -195,6 +205,7 @@ export default function TableauPage() {
             )}
             <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                 <div className="pointer-events-auto flex items-center gap-2">
+                    <ReactionButton editor={editorInstance} onReact={reactionsApi.sendReaction} />
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
                     <VersionHistoryPanel
                         tableauId={id}
