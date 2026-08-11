@@ -210,7 +210,7 @@ export default function TableauDeBordPage() {
                               setTableaux((prev) => prev.filter((x) => x.id !== t.id))
                             }
                           />
-                          <ShareDialog tableauId={t.id} />
+                          <ShareDialog tableauId={t.id} isOwner />
                         </div>
                       )}
                     </div>

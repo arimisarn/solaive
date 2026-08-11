@@ -12,11 +12,14 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 
+type Role = 'lecture' | 'edition' | 'admin';
+
 type Collaborateur = {
     user_id: string;
     email: string;
     created_at: string;
     statut: 'en_attente' | 'acceptee' | 'refusee';
+    role: Role;
 };
 
 const STATUT_LABELS: Record<Collaborateur['statut'], { label: string; className: string }> = {
@@ -25,11 +28,20 @@ const STATUT_LABELS: Record<Collaborateur['statut'], { label: string; className:
     refusee: { label: 'Refusé', className: 'bg-red-100 text-red-600' },
 };
 
+const ROLE_LABELS: Record<Role, string> = {
+    lecture: 'Lecture seule',
+    edition: 'Édition',
+    admin: 'Admin',
+};
+
 export function ShareDialog({
     tableauId,
+    isOwner,
     trigger,
 }: {
     tableauId: string;
+    /** Seul le owner peut changer le rôle des collaborateurs (contrainte appliquée aussi côté SQL). */
+    isOwner: boolean;
     trigger?: React.ReactNode;
 }) {
     const supabase = createClient();
@@ -37,12 +49,13 @@ export function ShareDialog({
     const [loading, setLoading] = useState(false);
     const [inviting, setInviting] = useState(false);
     const [removingId, setRemovingId] = useState<string | null>(null);
+    const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
     const [email, setEmail] = useState('');
     const [collaborateurs, setCollaborateurs] = useState<Collaborateur[]>([]);
 
     async function loadCollaborateurs() {
         setLoading(true);
-        const { data, error } = await supabase.rpc('lister_collaborateurs', {
+        const { data, error } = await supabase.rpc('lister_collaborateurs_avec_role', {
             p_tableau_id: tableauId,
         });
 
@@ -98,6 +111,25 @@ export function ShareDialog({
         setCollaborateurs((prev) => prev.filter((c) => c.user_id !== userId));
     }
 
+    async function handleRoleChange(userId: string, role: Role) {
+        setUpdatingRoleId(userId);
+
+        const { error } = await supabase.rpc('definir_role_collaborateur', {
+            p_tableau_id: tableauId,
+            p_user_id: userId,
+            p_role: role,
+        });
+
+        setUpdatingRoleId(null);
+
+        if (error) {
+            toast.error(error.message || "Impossible de modifier ce rôle.");
+            return;
+        }
+
+        setCollaborateurs((prev) => prev.map((c) => (c.user_id === userId ? { ...c, role } : c)));
+    }
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
@@ -137,6 +169,9 @@ export function ShareDialog({
                         Inviter
                     </button>
                 </div>
+                <p className="text-[11px] text-foreground/40">
+                    Les nouvelles personnes invitées reçoivent le rôle « Édition » par défaut — ajustable ci-dessous une fois acceptée.
+                </p>
 
                 <div className="mt-2">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-foreground/50">
@@ -157,7 +192,7 @@ export function ShareDialog({
                             {collaborateurs.map((c) => (
                                 <li
                                     key={c.user_id}
-                                    className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm"
+                                    className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span className="truncate text-foreground/80">{c.email}</span>
@@ -167,19 +202,37 @@ export function ShareDialog({
                                             {STATUT_LABELS[c.statut].label}
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemove(c.user_id)}
-                                        disabled={removingId === c.user_id}
-                                        className="text-foreground/40 hover:text-red-500 disabled:opacity-50"
-                                        aria-label={`Retirer ${c.email}`}
-                                    >
-                                        {removingId === c.user_id ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    <div className="flex shrink-0 items-center gap-1.5">
+                                        {isOwner ? (
+                                            <select
+                                                value={c.role}
+                                                disabled={updatingRoleId === c.user_id}
+                                                onChange={(e) => handleRoleChange(c.user_id, e.target.value as Role)}
+                                                className="h-7 rounded-md border border-border/60 bg-background px-1.5 text-xs outline-none focus:border-accent/50 disabled:opacity-50"
+                                            >
+                                                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                                                    <option key={r} value={r}>
+                                                        {ROLE_LABELS[r]}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         ) : (
-                                            <X className="h-3.5 w-3.5" />
+                                            <span className="text-xs text-foreground/50">{ROLE_LABELS[c.role]}</span>
                                         )}
-                                    </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemove(c.user_id)}
+                                            disabled={removingId === c.user_id}
+                                            className="text-foreground/40 hover:text-red-500 disabled:opacity-50"
+                                            aria-label={`Retirer ${c.email}`}
+                                        >
+                                            {removingId === c.user_id ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <X className="h-3.5 w-3.5" />
+                                            )}
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>

@@ -65,25 +65,40 @@ async function archiveVersion(roomId: string, snapshot: RoomSnapshot) {
 // Réplique en JS la logique de la fonction SQL `tableau_est_accessible` :
 // on tourne avec la clé service_role (qui contourne RLS), donc l'accès doit
 // être vérifié à la main avant toute opération sensible côté serveur.
-async function userCanAccessBoard(roomId: string, userId: string): Promise<boolean> {
+//
+// Renvoie le rôle effectif ('admin' pour le owner, sinon le rôle stocké sur
+// tableau_membres) ou null si aucun accès. Remplace l'ancien booléen
+// userCanAccessBoard : on a maintenant besoin de savoir PAS SEULEMENT si
+// l'utilisateur a accès, mais avec quel niveau (lecture seule ou non).
+async function getUserRoleForBoard(roomId: string, userId: string): Promise<'lecture' | 'edition' | 'admin' | null> {
     const { data: board } = await supabase
         .from('tableaux')
         .select('owner_id')
         .eq('id', roomId)
         .maybeSingle();
 
-    if (!board) return false;
-    if (board.owner_id === userId) return true;
+    if (!board) return null;
+    if (board.owner_id === userId) return 'admin';
 
-    const { data: membre } = await supabase
+    const { data: membre, error: membreError } = await supabase
         .from('tableau_membres')
-        .select('id')
+        .select('role')
         .eq('tableau_id', roomId)
         .eq('user_id', userId)
         .eq('statut', 'acceptee')
         .maybeSingle();
 
-    return !!membre;
+    if (membreError) {
+        // Erreur silencieuse dangereuse : avant, on ignorait `error` et on
+        // retombait sur `null` (accès refusé) sans jamais savoir pourquoi.
+        // Le cas le plus probable : la colonne `role` n'existe pas encore
+        // (migration SQL de gestion des permissions non exécutée) — le
+        // message Postgres le dit explicitement, donc on le logge.
+        console.error(`Erreur lecture rôle pour ${roomId}/${userId}:`, membreError.message);
+        return null;
+    }
+
+    return (membre?.role as 'lecture' | 'edition' | 'admin' | undefined) ?? null;
 }
 
 function readJsonBody(req: IncomingMessage): Promise<any> {
@@ -143,9 +158,13 @@ async function handleRestore(req: IncomingMessage, res: ServerResponse, roomId: 
         return;
     }
 
-    const allowed = await userCanAccessBoard(roomId, userData.user.id);
-    if (!allowed) {
+    const role = await getUserRoleForBoard(roomId, userData.user.id);
+    if (!role) {
         res.writeHead(403).end('Accès refusé à ce tableau.');
+        return;
+    }
+    if (role === 'lecture') {
+        res.writeHead(403).end('Lecture seule : restauration non autorisée.');
         return;
     }
 
@@ -211,7 +230,7 @@ function createRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> {
             initialSnapshot,
             onSessionRemoved: (r, { numSessionsRemaining }) => {
                 if (numSessionsRemaining === 0) {
-                    console.log(`Room ${roomId} vide, fermeture programmée dans ${EMPTY_ROOM_GRACE_MS / 1000}s si personne ne revient.`);
+                    console.log(`[${new Date().toISOString()}] Room ${roomId} vide, fermeture programmée dans ${EMPTY_ROOM_GRACE_MS / 1000}s si personne ne revient.`);
                     const existingTimer = closeTimers.get(roomId);
                     if (existingTimer) clearTimeout(existingTimer);
 
@@ -294,7 +313,7 @@ async function getOrCreateRoom(roomId: string): Promise<TLSocketRoom<TLRecord>> 
         if (existingTimer) {
             clearTimeout(existingTimer);
             closeTimers.delete(roomId);
-            console.log(`Room ${roomId} : nouvelle connexion, fermeture annulée.`);
+            console.log(`[${new Date().toISOString()}] Room ${roomId} : nouvelle connexion, fermeture annulée.`);
         }
         return existingRoom;
     }
@@ -339,18 +358,70 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', async (socket, req) => {
-    const url = new URL(req.url ?? '', `http://${req.headers.host}`);
-    const match = url.pathname.match(/^\/connect\/(.+)$/);
-    const sessionId = url.searchParams.get('sessionId');
+    try {
+        const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+        const match = url.pathname.match(/^\/connect\/(.+)$/);
+        const sessionId = url.searchParams.get('sessionId');
+        const accessToken = url.searchParams.get('accessToken');
 
-    if (!match || !sessionId) {
-        socket.close();
-        return;
+        if (!match || !sessionId) {
+            socket.close();
+            return;
+        }
+
+        const roomId = match[1];
+
+        // AVANT ce correctif : aucune vérification n'était faite ici — n'importe
+        // quelle connexion WebSocket connaissant l'ID du tableau était acceptée
+        // en écriture, RLS ou pas (ce serveur tourne avec la clé service_role,
+        // qui contourne RLS). C'était le vrai trou par rapport à l'exigence 5.2
+        // du cahier des charges ("validation des permissions à chaque écriture,
+        // côté serveur"). Le token est vérifié ici, PAS seulement côté client.
+        if (!accessToken) {
+            console.warn(`Connexion refusée pour room ${roomId} : accessToken manquant.`);
+            socket.close();
+            return;
+        }
+
+        const { data: userData, error: authError } = await supabase.auth.getUser(accessToken);
+        if (authError || !userData.user) {
+            console.warn(`Connexion refusée pour room ${roomId} : token invalide ou expiré.`, authError?.message);
+            socket.close();
+            return;
+        }
+
+        const role = await getUserRoleForBoard(roomId, userData.user.id);
+        if (!role) {
+            console.warn(`Connexion refusée pour room ${roomId} : ${userData.user.id} n'a pas accès à ce tableau.`);
+            socket.close();
+            return;
+        }
+
+        const room = await getOrCreateRoom(roomId);
+        console.log(`[${new Date().toISOString()}] Connexion acceptée room ${roomId} — user ${userData.user.id.slice(0, 8)} — session ${sessionId} — rôle ${role}`);
+        // isReadonly est appliqué par tldraw AU NIVEAU DE LA SESSION SERVEUR :
+        // un client en rôle "lecture" qui bricolerait son propre état local ne
+        // peut de toute façon pas pousser de modification, la room les rejette.
+        room.handleSocketConnect({ sessionId, socket, isReadonly: role === 'lecture' });
+
+        socket.on('close', (code, reason) => {
+            console.log(`[${new Date().toISOString()}] Socket fermé room ${roomId} — session ${sessionId} — code ${code} — raison "${reason.toString()}"`);
+        });
+    } catch (err) {
+        // Filet de sécurité critique : avant, la moindre exception ici (requête
+        // Supabase qui échoue, colonne manquante, etc.) rejetait la promesse
+        // sans jamais fermer le socket -> le client restait connecté au niveau
+        // WebSocket brut mais ne recevait jamais la poignée de main tldraw,
+        // et tournait en chargement infini SANS AUCUNE ERREUR visible. On logge
+        // et on ferme systématiquement pour que le client puisse au moins
+        // retenter, et que l'erreur soit visible dans le terminal du serveur.
+        console.error('Erreur inattendue lors de la connexion WebSocket :', err);
+        try {
+            socket.close();
+        } catch {
+            // socket déjà fermé/dans un état invalide, rien à faire de plus.
+        }
     }
-
-    const roomId = match[1];
-    const room = await getOrCreateRoom(roomId);
-    room.handleSocketConnect({ sessionId, socket });
 });
 
 httpServer.listen(PORT, () => {

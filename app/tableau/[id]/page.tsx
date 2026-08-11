@@ -20,6 +20,7 @@ import { TimerButton } from '@/components/TimerButton';
 import { PresentationButton } from '@/components/PresentationButton';
 import { PollButton } from '@/components/PollButton';
 import { LayersPanel } from '@/components/LayersPanel';
+import { useTableauRole } from '@/hooks/use-tableau-role';
 import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
 import { useReactions } from '@/hooks/use-reactions';
 import { useTableauPresentation } from '@/hooks/use-tableau-presentation';
@@ -39,22 +40,26 @@ function colorForUser(id: string) {
 export default function TableauPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const supabase = createClient();
+    // Instance stable sur tout le cycle de vie du composant : createClient()
+    // était appelé directement dans le corps du composant (donc un NOUVEL
+    // objet à chaque rendu) tout en étant listé dans les deps du useEffect
+    // ci-dessous -> l'effet se relançait à CHAQUE rendu, créant un nouveau
+    // client Supabase à chaque fois. Chaque nouveau client doit réhydrater
+    // sa session depuis les cookies de façon asynchrone ; plusieurs
+    // checkAccess() se chevauchaient donc en permanence, et celui qui
+    // terminait en dernier pouvait tomber sur une session pas encore
+    // complètement hydratée -> accessToken restait bloqué à null pour
+    // toujours (avec status déjà 'ok'), d'où le tableau qui ne charge jamais.
+    const [supabase] = useState(() => createClient());
 
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
     const [isOwner, setIsOwner] = useState(false);
     const [titre, setTitre] = useState<string | null>(null);
-    const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
-    const templateAppliedRef = useRef(false);
-    // Chat, historique des versions et commentaires partagent le même
-    // emplacement de panneau flottant (bas-droite) : un seul à la fois.
-    const [activePanel, setActivePanel] = useState<'chat' | 'versions' | 'comments' | null>(null);
-    // Mode "placement" : le prochain clic sur le canvas crée un nouveau pin de commentaire.
-    const [commentPlacing, setCommentPlacing] = useState(false);
-    // Fil de commentaire actuellement affiché en bulle flottante sur le canvas.
-    const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+    // Token JWT courant, transmis au serveur de sync WebSocket pour qu'il
+    // authentifie la connexion et détermine le rôle (au lieu d'accepter
+    // n'importe quelle connexion comme avant).
+    const [accessToken, setAccessToken] = useState<string | null>(null);
 
     useEffect(() => {
         async function checkAccess() {
@@ -63,6 +68,17 @@ export default function TableauPage() {
                 router.push('/connexion');
                 return;
             }
+
+            let { data: sessionData } = await supabase.auth.getSession();
+            // Filet de sécurité : juste après une redirection (ex. depuis /connexion),
+            // le client Supabase peut ne pas avoir fini de réhydrater la session depuis
+            // le storage au moment de ce premier appel. Un seul retry après un court
+            // délai suffit à éviter de partir avec un accessToken vide.
+            if (!sessionData.session?.access_token) {
+                await new Promise((resolve) => setTimeout(resolve, 300));
+                ({ data: sessionData } = await supabase.auth.getSession());
+            }
+            setAccessToken(sessionData.session?.access_token ?? null);
 
             setUserInfo({
                 id: userData.user.id,
@@ -91,16 +107,84 @@ export default function TableauPage() {
         checkAccess();
     }, [id, router, supabase]);
 
+    if (status === 'not-found') {
+        return (
+            <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background">
+                <p className="text-foreground/70">Ce tableau n'existe pas ou tu n'y as pas accès.</p>
+                <button
+                    type="button"
+                    onClick={() => router.push('/tableau-de-bord')}
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-accent hover:border-accent/40"
+                >
+                    Retour au tableau de bord
+                </button>
+            </div>
+        );
+    }
+
+    // IMPORTANT : on ne monte le workspace (donc on n'appelle useSync) qu'une fois
+    // l'utilisateur ET son accessToken connus (status === 'ok' && accessToken).
+    // Avant ce garde-fou, useSync() était appelé dès le tout premier rendu de CE
+    // composant (les hooks ne peuvent pas être conditionnels), donc avec un
+    // accessToken encore vide -> le serveur de sync fermait la connexion
+    // immédiatement (accessToken manquant) et le store restait bloqué en
+    // chargement indéfiniment, quel que soit le tableau ouvert. En isolant
+    // useSync dans un composant enfant distinct, ses hooks ne s'exécutent
+    // qu'au moment où on le monte réellement, donc avec un token déjà valide.
+    if (status === 'checking' || !userInfo || !accessToken) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
+            </div>
+        );
+    }
+
+    return (
+        <TableauWorkspace
+            id={id}
+            router={router}
+            accessToken={accessToken}
+            userInfo={userInfo}
+            isOwner={isOwner}
+            titre={titre}
+        />
+    );
+}
+
+function TableauWorkspace({
+    id,
+    router,
+    accessToken,
+    userInfo,
+    isOwner,
+    titre,
+}: {
+    id: string;
+    router: ReturnType<typeof useRouter>;
+    accessToken: string;
+    userInfo: { id: string; name: string };
+    isOwner: boolean;
+    titre: string | null;
+}) {
+    const searchParams = useSearchParams();
+    const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
+    const templateAppliedRef = useRef(false);
+    // Chat, historique des versions et commentaires partagent le même
+    // emplacement de panneau flottant (bas-droite) : un seul à la fois.
+    const [activePanel, setActivePanel] = useState<'chat' | 'versions' | 'comments' | null>(null);
+    // Mode "placement" : le prochain clic sur le canvas crée un nouveau pin de commentaire.
+    const [commentPlacing, setCommentPlacing] = useState(false);
+    // Fil de commentaire actuellement affiché en bulle flottante sur le canvas.
+    const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
     const currentUser = useMemo(
         () =>
             computed('current-user', () =>
-                userInfo
-                    ? UserRecordType.create({
-                        id: createUserId(userInfo.id),
-                        name: userInfo.name,
-                        color: colorForUser(userInfo.id),
-                    })
-                    : null
+                UserRecordType.create({
+                    id: createUserId(userInfo.id),
+                    name: userInfo.name,
+                    color: colorForUser(userInfo.id),
+                })
             ),
         [userInfo]
     );
@@ -108,25 +192,31 @@ export default function TableauPage() {
     const store = useSync(
         useMemo(
             () => ({
-                uri: `ws://localhost:5858/connect/${id}`,
+                // accessToken en query param : le serveur de sync l'utilise pour
+                // authentifier la connexion et déterminer le rôle (voir server/index.ts).
+                // Avant ce changement, N'IMPORTE QUELLE connexion WebSocket avec le bon
+                // ID de tableau était acceptée sans vérification — faille corrigée ici.
+                uri: `ws://localhost:5858/connect/${id}?accessToken=${encodeURIComponent(accessToken)}`,
                 assets: inlineBase64AssetStore,
                 users: { currentUser },
             }),
-            [id, currentUser]
+            [id, currentUser, accessToken]
         )
     );
 
+    const { isReadonly: isReadonlyRole, canManageSharing } = useTableauRole({ tableauId: id, isOwner });
+
     const commentsApi = useTableauComments({
         tableauId: id,
-        userId: userInfo?.id ?? '',
-        userName: userInfo?.name ?? '',
+        userId: userInfo.id,
+        userName: userInfo.name,
         isPanelOpen: activePanel === 'comments' || activeThreadId !== null,
     });
 
     const reactionsApi = useReactions({
         tableauId: id,
-        userId: userInfo?.id ?? '',
-        userName: userInfo?.name ?? '',
+        userId: userInfo.id,
+        userName: userInfo.name,
     });
 
     const presentationApi = useTableauPresentation({ tableauId: id });
@@ -134,7 +224,8 @@ export default function TableauPage() {
     usePresentationFollow({
         editor: editorInstance,
         presentateurId: presentationApi.state?.presentateur_id ?? null,
-        currentUserId: userInfo?.id ?? '',
+        currentUserId: userInfo.id,
+        readonlyFromRole: isReadonlyRole,
     });
 
     // Centre la caméra sur l'ancre du fil (position de la forme si elle existe
@@ -162,35 +253,6 @@ export default function TableauPage() {
         router.replace(`/tableau/${id}`);
     }
 
-    if (status === 'not-found') {
-        return (
-            <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background">
-                <p className="text-foreground/70">Ce tableau n'existe pas ou tu n'y as pas accès.</p>
-                <button
-                    type="button"
-                    onClick={() => router.push('/tableau-de-bord')}
-                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-accent hover:border-accent/40"
-                >
-                    Retour au tableau de bord
-                </button>
-            </div>
-        );
-    }
-
-    // IMPORTANT : on ne monte <Tldraw> qu'une fois l'utilisateur connu (status === 'ok').
-    // Sinon `currentUser`/`store` sont d'abord créés avec userInfo=null, puis recréés
-    // dès que checkAccess() résout -> useSync() se reconnecte de zéro et un éventuel
-    // éditeur/template appliqué sur la première connexion (provisoire) est perdu avant
-    // d'avoir pu être flushé sur le websocket. C'était la cause du template qui
-    // disparaissait au reload et du crash "AtomMap: key [object Object] not found".
-    if (status === 'checking' || !userInfo) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-6 w-6 animate-spin text-accent" />
-            </div>
-        );
-    }
-
     return (
         <div className="fixed inset-0">
             <Tldraw store={store} onMount={handleMount} />
@@ -212,8 +274,13 @@ export default function TableauPage() {
             <ReactionBursts editor={editorInstance} bursts={reactionsApi.bursts} />
             {titre && (
                 <div className="pointer-events-none absolute left-3 top-3 z-[300]">
-                    <div className="rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
+                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
                         {titre}
+                        {isReadonlyRole && (
+                            <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium text-foreground/60">
+                                Lecture seule
+                            </span>
+                        )}
                     </div>
                 </div>
             )}
@@ -262,24 +329,24 @@ export default function TableauPage() {
                         onOpenChange={(next) => setActivePanel(next ? 'chat' : null)}
                     />
                     {isOwner && (
-                        <>
-                            <DeleteBoardDialog
-                                tableauId={id}
-                                titre={titre}
-                                onDeleted={() => router.push('/tableau-de-bord')}
-                                trigger={
-                                    <button
-                                        type="button"
-                                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-foreground/60 shadow-sm backdrop-blur-sm transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
-                                        title="Supprimer le tableau"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                }
-                            />
-                            <ShareDialog tableauId={id} />
-                        </>
+                        <DeleteBoardDialog
+                            tableauId={id}
+                            titre={titre}
+                            onDeleted={() => router.push('/tableau-de-bord')}
+                            trigger={
+                                <button
+                                    type="button"
+                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-foreground/60 shadow-sm backdrop-blur-sm transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
+                                    title="Supprimer le tableau"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            }
+                        />
                     )}
+                    {/* Partage ouvert au owner ET aux membres avec le rôle "admin" —
+                        la suppression du tableau, elle, reste strictement réservée au owner. */}
+                    {(isOwner || canManageSharing) && <ShareDialog tableauId={id} isOwner={isOwner} />}
                 </div>
             </div>
         </div>
