@@ -17,8 +17,11 @@ import { CommentPins } from '@/components/CommentPins';
 import { ReactionButton } from '@/components/ReactionButton';
 import { ReactionBursts } from '@/components/ReactionBursts';
 import { TimerButton } from '@/components/TimerButton';
+import { PresentationButton } from '@/components/PresentationButton';
 import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
 import { useReactions } from '@/hooks/use-reactions';
+import { useTableauPresentation } from '@/hooks/use-tableau-presentation';
+import { usePresentationFollow } from '@/hooks/use-presentation-follow';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
@@ -124,6 +127,14 @@ export default function TableauPage() {
         userName: userInfo?.name ?? '',
     });
 
+    const presentationApi = useTableauPresentation({ tableauId: id });
+
+    usePresentationFollow({
+        editor: editorInstance,
+        presentateurId: presentationApi.state?.presentateur_id ?? null,
+        currentUserId: userInfo?.id ?? '',
+    });
+
     // Centre la caméra sur l'ancre du fil (position de la forme si elle existe
     // encore, sinon les coordonnées d'origine du commentaire) puis l'ouvre.
     function focusThread(comment: Commentaire) {
@@ -206,6 +217,14 @@ export default function TableauPage() {
             )}
             <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                 <div className="pointer-events-auto flex items-center gap-2">
+                    <PresentationButton
+                        presentateurId={presentationApi.state?.presentateur_id ?? null}
+                        presentateurNom={presentationApi.state?.presentateur_nom ?? null}
+                        currentUserId={userInfo.id}
+                        isOwner={isOwner}
+                        onStart={() => presentationApi.start(userInfo.name)}
+                        onStop={() => presentationApi.stop()}
+                    />
                     <TimerButton tableauId={id} />
                     <ReactionButton editor={editorInstance} onReact={reactionsApi.sendReaction} />
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
