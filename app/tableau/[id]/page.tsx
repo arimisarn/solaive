@@ -16,6 +16,7 @@ import { CommentsPanel } from '@/components/CommentsPanel';
 import { CommentPins } from '@/components/CommentPins';
 import { ReactionButton } from '@/components/ReactionButton';
 import { ReactionBursts } from '@/components/ReactionBursts';
+import { TimerButton } from '@/components/TimerButton';
 import { useTableauComments, type Commentaire } from '@/hooks/use-tableau-comments';
 import { useReactions } from '@/hooks/use-reactions';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
@@ -205,6 +206,7 @@ export default function TableauPage() {
             )}
             <div className="pointer-events-none absolute right-3 top-3 z-[300]">
                 <div className="pointer-events-auto flex items-center gap-2">
+                    <TimerButton tableauId={id} />
                     <ReactionButton editor={editorInstance} onReact={reactionsApi.sendReaction} />
                     <ExportBoardMenu editor={editorInstance} titre={titre} />
                     <VersionHistoryPanel
