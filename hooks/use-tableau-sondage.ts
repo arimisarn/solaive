@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/clients';
+import { computeTally, findMyVote } from '@/lib/sondage-utils';
 
 export type SondageOption = { id: string; texte: string };
 
@@ -159,13 +160,9 @@ export function useTableauSondage({ tableauId, userId }: { tableauId: string; us
         return { error: error?.message ?? null };
     }
 
-    const myVote = useMemo(() => votes.find((v) => v.user_id === userId)?.option_id ?? null, [votes, userId]);
+    const myVote = useMemo(() => findMyVote(votes, userId), [votes, userId]);
 
-    const tally = useMemo(() => {
-        const counts: Record<string, number> = {};
-        for (const v of votes) counts[v.option_id] = (counts[v.option_id] ?? 0) + 1;
-        return counts;
-    }, [votes]);
+    const tally = useMemo(() => computeTally(votes), [votes]);
 
     return {
         poll,
@@ -180,4 +177,4 @@ export function useTableauSondage({ tableauId, userId }: { tableauId: string; us
         close,
         remove,
     };
-}   
+}

@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws';
 import { TLSocketRoom, type RoomSnapshot } from '@tldraw/sync-core';
 import { createTLSchema, type TLRecord } from '@tldraw/tlschema';
 import { createClient } from '@supabase/supabase-js';
+import { getUserRoleForBoard as resolveUserRoleForBoard, type SupabaseLike } from './access-control';
 
 const PORT = 5858;
 const SAVE_INTERVAL_MS = 20_000;
@@ -70,35 +71,24 @@ async function archiveVersion(roomId: string, snapshot: RoomSnapshot) {
 // tableau_membres) ou null si aucun accès. Remplace l'ancien booléen
 // userCanAccessBoard : on a maintenant besoin de savoir PAS SEULEMENT si
 // l'utilisateur a accès, mais avec quel niveau (lecture seule ou non).
+//
+// La logique elle-même vit dans server/access-control.ts (client Supabase
+// injecté) pour pouvoir être testée avec Vitest sans base de données réelle
+// — voir server/__tests__/access-control.test.ts. Ce wrapper se contente de
+// brancher le client réel et de logger toute erreur Postgres (colonne
+// manquante si une migration SQL n'a pas été exécutée, etc.) qui, avant,
+// était silencieusement avalée.
 async function getUserRoleForBoard(roomId: string, userId: string): Promise<'lecture' | 'edition' | 'admin' | null> {
-    const { data: board } = await supabase
-        .from('tableaux')
-        .select('owner_id')
-        .eq('id', roomId)
-        .maybeSingle();
-
-    if (!board) return null;
-    if (board.owner_id === userId) return 'admin';
-
-    const { data: membre, error: membreError } = await supabase
-        .from('tableau_membres')
-        .select('role')
-        .eq('tableau_id', roomId)
-        .eq('user_id', userId)
-        .eq('statut', 'acceptee')
-        .maybeSingle();
-
-    if (membreError) {
-        // Erreur silencieuse dangereuse : avant, on ignorait `error` et on
-        // retombait sur `null` (accès refusé) sans jamais savoir pourquoi.
-        // Le cas le plus probable : la colonne `role` n'existe pas encore
-        // (migration SQL de gestion des permissions non exécutée) — le
-        // message Postgres le dit explicitement, donc on le logge.
-        console.error(`Erreur lecture rôle pour ${roomId}/${userId}:`, membreError.message);
-        return null;
+    // Cast explicite : passer le vrai SupabaseClient (type très générique,
+    // avec plusieurs niveaux de paramètres) directement en tant que
+    // SupabaseLike fait exploser l'inférence TypeScript ("Type instantiation
+    // is excessively deep"). SupabaseLike ne décrit que la toute petite
+    // surface réellement utilisée (from/select/eq), donc ce cast est sûr.
+    const { role, error } = await resolveUserRoleForBoard(supabase as unknown as SupabaseLike, roomId, userId);
+    if (error) {
+        console.error(`Erreur lecture rôle pour ${roomId}/${userId}:`, error);
     }
-
-    return (membre?.role as 'lecture' | 'edition' | 'admin' | undefined) ?? null;
+    return role;
 }
 
 function readJsonBody(req: IncomingMessage): Promise<any> {

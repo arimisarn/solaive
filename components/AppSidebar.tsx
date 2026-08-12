@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Bell } from 'lucide-react';
+import { LayoutDashboard, LogOut, Bell, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { useInvitationsCount } from '@/components/InvitationsList';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -62,6 +62,15 @@ export function AppSidebar() {
                 <Link href="/tableau-de-bord">
                   <LayoutDashboard className="h-4 w-4 shrink-0" />
                   <span data-sidebar="label">Tableau de bord</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Favoris">
+                <Link href="/favoris">
+                  <Star className="h-4 w-4 shrink-0" />
+                  <span data-sidebar="label">Favoris</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -1,15 +1,14 @@
 'use client';
 
-import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PenLine, Users, StickyNote, Loader2, LayoutGrid } from 'lucide-react';
+import { PenLine, Users, StickyNote, Loader2, LayoutGrid, Search, Star, X } from 'lucide-react';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
-import { ShareDialog } from '@/components/ShareDialog';
-import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { AppSidebar } from '@/components/AppSidebar';
 import { TemplatePickerDialog } from '@/components/TemplatePickerDialog';
+import { TableauCard, type TableauAvecStats } from '@/components/TableauCard';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar-ui';
+import { useFavoris } from '@/hooks/use-favoris';
 import { createClient } from '@/lib/supabase/clients';
 import type { TemplateId } from '@/lib/templates';
 import { toast } from 'sonner';
@@ -19,29 +18,15 @@ const ACTIONS = [
   { icon: StickyNote, label: 'Ouvrir un brouillon' },
 ];
 
-type Tableau = {
-  id: string;
-  created_at: string | null;
-  owner_id: string;
-  titre: string | null;
-};
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
 export default function TableauDeBordPage() {
   const router = useRouter();
   const supabase = createClient();
   const [creating, setCreating] = useState(false);
-  const [tableaux, setTableaux] = useState<Tableau[]>([]);
+  const [tableaux, setTableaux] = useState<TableauAvecStats[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const { favoris, toggleFavori } = useFavoris();
 
   const loadTableaux = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -52,13 +37,10 @@ export default function TableauDeBordPage() {
 
     setUserId(userData.user.id);
 
-    // Pas de filtre .eq('owner_id', ...) ici : la policy RLS "tableaux: lecture"
-    // renvoie maintenant à la fois les tableaux possédés ET ceux partagés avec
-    // l'utilisateur (une fois l'invitation acceptée) via tableau_membres.
-    const { data, error } = await supabase
-      .from('tableaux')
-      .select('id, created_at, owner_id, titre')
-      .order('created_at', { ascending: false });
+    // lister_mes_tableaux (RPC) réplique la policy RLS "tableaux: lecture"
+    // (owner OU membre accepté) et ajoute le nombre de collaborateurs par
+    // tableau en une seule requête plutôt qu'un select direct + N requêtes.
+    const { data, error } = await supabase.rpc('lister_mes_tableaux');
 
     if (error) {
       toast.error('Impossible de charger tes tableaux.');
@@ -100,6 +82,25 @@ export default function TableauDeBordPage() {
 
     router.push(templateId ? `/tableau/${data.id}?template=${templateId}` : `/tableau/${data.id}`);
   }
+
+  function handleDeleted(id: string) {
+    setTableaux((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return tableaux;
+    return tableaux.filter((t) => (t.titre || '').toLowerCase().includes(q));
+  }, [tableaux, query]);
+
+  const epingles = useMemo(
+    () => filtered.filter((t) => favoris.has(t.id)),
+    [filtered, favoris]
+  );
+  const reste = useMemo(
+    () => filtered.filter((t) => !favoris.has(t.id)),
+    [filtered, favoris]
+  );
 
   return (
     <SidebarProvider>
@@ -157,6 +158,51 @@ export default function TableauDeBordPage() {
             ))}
           </div>
 
+          {!loadingList && tableaux.length > 0 && (
+            <div className="relative mt-10 max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Rechercher un tableau…"
+                className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-8 text-sm outline-none focus:border-accent/50"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Effacer la recherche"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {epingles.length > 0 && (
+            <div className="mt-10">
+              <h2 className="flex items-center gap-1.5 font-heading text-xl font-bold text-foreground">
+                <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                Épinglés
+              </h2>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {epingles.map((t, i) => (
+                  <TableauCard
+                    key={t.id}
+                    tableau={t}
+                    isOwner={t.owner_id === userId}
+                    isFavori
+                    onToggleFavori={toggleFavori}
+                    onDeleted={handleDeleted}
+                    animationDelay={`${i * 0.05}s`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-12">
             <h2 className="font-heading text-xl font-bold text-foreground">
               Tes tableaux
@@ -171,51 +217,26 @@ export default function TableauDeBordPage() {
               <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
                 <LayoutGrid className="h-6 w-6 text-foreground/40" />
                 <p className="text-sm text-foreground/60">
-                  Tu n'as pas encore de tableau. Crée le premier ci-dessus.
+                  Tu n&apos;as pas encore de tableau. Crée le premier ci-dessus.
                 </p>
               </div>
+            ) : reste.length === 0 ? (
+              <p className="mt-6 text-sm text-foreground/50">
+                {query ? 'Aucun tableau ne correspond à ta recherche.' : 'Tous tes tableaux sont épinglés ci-dessus.'}
+              </p>
             ) : (
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {tableaux.map((t, i) => {
-                  const isOwner = t.owner_id === userId;
-                  return (
-                    <div
-                      key={t.id}
-                      className="flex animate-fade-up flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-sm"
-                      style={{ animationDelay: `${i * 0.05}s` }}
-                    >
-                      <Link href={`/tableau/${t.id}`} className="flex flex-col gap-2">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                          <PenLine className="h-5 w-5" />
-                        </span>
-                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          {t.titre || `Tableau du ${formatDate(t.created_at)}`}
-                          {!isOwner && (
-                            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
-                              Partagé
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-xs text-foreground/50">
-                          {formatDate(t.created_at)}
-                        </span>
-                      </Link>
-
-                      {isOwner && (
-                        <div className="mt-1 flex items-center justify-end gap-1">
-                          <DeleteBoardDialog
-                            tableauId={t.id}
-                            titre={t.titre || `Tableau du ${formatDate(t.created_at)}`}
-                            onDeleted={() =>
-                              setTableaux((prev) => prev.filter((x) => x.id !== t.id))
-                            }
-                          />
-                          <ShareDialog tableauId={t.id} isOwner />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {reste.map((t, i) => (
+                  <TableauCard
+                    key={t.id}
+                    tableau={t}
+                    isOwner={t.owner_id === userId}
+                    isFavori={false}
+                    onToggleFavori={toggleFavori}
+                    onDeleted={handleDeleted}
+                    animationDelay={`${i * 0.05}s`}
+                  />
+                ))}
               </div>
             )}
           </div>
