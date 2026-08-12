@@ -14,6 +14,8 @@ export type TableauAvecStats = {
     owner_id: string;
     titre: string | null;
     nb_collaborateurs: number;
+    owner_email: string | null;
+    collaborateurs_emails: string[] | null;
 };
 
 function formatDate(dateStr: string | null) {
@@ -60,6 +62,11 @@ export function TableauCard({
                             </span>
                         )}
                     </span>
+                    {!isOwner && tableau.owner_email && (
+                        <span className="truncate text-xs text-foreground/45">
+                            Partagé par {tableau.owner_email}
+                        </span>
+                    )}
                 </Link>
 
                 <button
@@ -85,9 +92,25 @@ export function TableauCard({
                     {formatActiviteRelative(tableau.updated_at ?? tableau.created_at)}
                 </span>
                 {tableau.nb_collaborateurs > 0 && (
-                    <span className="inline-flex items-center gap-1" title="Collaborateurs">
-                        <Users className="h-3 w-3" />
-                        {tableau.nb_collaborateurs}
+                    <span
+                        className="inline-flex min-w-0 items-center gap-1"
+                        title={
+                            isOwner && tableau.collaborateurs_emails
+                                ? tableau.collaborateurs_emails.join(', ')
+                                : 'Collaborateurs'
+                        }
+                    >
+                        <Users className="h-3 w-3 shrink-0" />
+                        {isOwner && tableau.collaborateurs_emails?.length ? (
+                            <span className="truncate">
+                                {tableau.collaborateurs_emails.slice(0, 2).join(', ')}
+                                {tableau.collaborateurs_emails.length > 2
+                                    ? ` +${tableau.collaborateurs_emails.length - 2}`
+                                    : ''}
+                            </span>
+                        ) : (
+                            tableau.nb_collaborateurs
+                        )}
                     </span>
                 )}
             </div>

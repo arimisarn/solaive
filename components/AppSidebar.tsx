@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Bell, Star, Keyboard } from 'lucide-react';
+import { LayoutDashboard, LogOut, Bell, Star, Keyboard, Settings } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { useInvitationsCount } from '@/components/InvitationsList';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -99,17 +99,30 @@ export function AppSidebar() {
 
       <SidebarFooter>
         {email && (
-          <div className={collapsed ? 'flex justify-center' : 'flex items-center gap-2 px-1'}>
+          <div
+            className={
+              collapsed
+                ? 'flex flex-col items-center gap-1'
+                : 'flex items-center gap-2 px-1'
+            }
+          >
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarFallback className="bg-accent text-xs font-semibold text-white">
                 {email.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
-              <span className="min-w-0 truncate text-xs text-foreground/60" title={email}>
+              <span className="min-w-0 flex-1 truncate text-xs text-foreground/60" title={email}>
                 {email}
               </span>
             )}
+            <Link
+              href="/parametres"
+              title="Paramètres"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
           </div>
         )}
         <SidebarMenu>
