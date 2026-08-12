@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -6,7 +6,9 @@ WORKDIR /app
 # (meilleur cache Docker : si le code change mais pas package.json, l'étape
 # npm install n'est pas relancée).
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm install --no-save tsx
+# npm install (et non npm ci) : tolère un package-lock.json légèrement
+# désynchronisé, ce que npm ci refuse strictement.
+RUN npm install --omit=dev --ignore-scripts && npm install --no-save tsx
 
 # Le serveur n'a besoin que de server/ (pas de app/, components/, etc.)
 COPY server ./server
