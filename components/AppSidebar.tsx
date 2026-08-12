@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Bell, Star, Keyboard, Settings } from 'lucide-react';
+import { LayoutDashboard, LogOut, Bell, Star, Keyboard, Settings, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { useInvitationsCount } from '@/components/InvitationsList';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -90,6 +90,15 @@ export function AppSidebar() {
                 <Link href="/raccourcis">
                   <Keyboard className="h-4 w-4 shrink-0" />
                   <span data-sidebar="label">Raccourcis</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Corbeille">
+                <Link href="/corbeille">
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  <span data-sidebar="label">Corbeille</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

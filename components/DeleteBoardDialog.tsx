@@ -24,7 +24,7 @@ export function DeleteBoardDialog({
 }: {
     tableauId: string;
     titre?: string | null;
-    /** Appelé une fois la suppression confirmée en base. */
+    /** Appelé une fois le tableau déplacé dans la corbeille. */
     onDeleted: () => void;
     trigger?: React.ReactNode;
 }) {
@@ -35,17 +35,23 @@ export function DeleteBoardDialog({
     async function handleDelete() {
         setDeleting(true);
 
-        const { error } = await supabase.from('tableaux').delete().eq('id', tableauId);
+        // Soft-delete : on ne supprime plus la ligne, on la marque comme
+        // corbeillée (deleted_at). lister_mes_tableaux filtre déjà dessus,
+        // donc le tableau disparaît du dashboard immédiatement, pour le
+        // owner comme pour les collaborateurs.
+        const { error } = await supabase.rpc('mettre_a_la_corbeille', {
+            p_tableau_id: tableauId,
+        });
 
         setDeleting(false);
 
         if (error) {
-            toast.error("Impossible de supprimer le tableau. Réessaie.");
+            toast.error("Impossible de déplacer le tableau vers la corbeille. Réessaie.");
             return;
         }
 
         setOpen(false);
-        toast.success('Tableau supprimé.');
+        toast.success('Tableau déplacé dans la corbeille.');
         onDeleted();
     }
 
@@ -64,16 +70,16 @@ export function DeleteBoardDialog({
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Supprimer ce tableau ?</AlertDialogTitle>
+                    <AlertDialogTitle>Déplacer ce tableau vers la corbeille ?</AlertDialogTitle>
                     <AlertDialogDescription>
                         {titre ? (
                             <>
                                 Le tableau <span className="font-medium text-foreground">« {titre} »</span> sera
-                                définitivement supprimé, ainsi que tout son contenu et les invitations associées.
-                                Cette action est irréversible.
+                                déplacé dans la corbeille et n&apos;apparaîtra plus dans le tableau de bord. Tu
+                                pourras le restaurer ou le supprimer définitivement depuis la corbeille.
                             </>
                         ) : (
-                            'Le tableau sera définitivement supprimé, ainsi que tout son contenu et les invitations associées. Cette action est irréversible.'
+                            "Le tableau sera déplacé dans la corbeille et n'apparaîtra plus dans le tableau de bord. Tu pourras le restaurer ou le supprimer définitivement depuis la corbeille."
                         )}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -90,10 +96,10 @@ export function DeleteBoardDialog({
                         {deleting ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Suppression…
+                                Déplacement…
                             </>
                         ) : (
-                            'Supprimer définitivement'
+                            'Déplacer vers la corbeille'
                         )}
                     </AlertDialogAction>
                 </AlertDialogFooter>
