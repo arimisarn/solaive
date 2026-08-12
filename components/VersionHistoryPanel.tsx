@@ -21,7 +21,7 @@ type VersionRow = {
     label: string | null;
 };
 
-const SYNC_SERVER_URL = 'http://localhost:5858';
+const SYNC_SERVER_URL = process.env.NEXT_PUBLIC_SYNC_SERVER_URL;
 
 function formatDate(iso: string) {
     return new Date(iso).toLocaleString('fr-FR', {

@@ -160,7 +160,7 @@ function TableauWorkspace({
     const store = useSync(
         useMemo(
             () => ({
-                uri: `ws://localhost:5858/connect/${id}?accessToken=${encodeURIComponent(accessToken)}`,
+                uri: `${process.env.NEXT_PUBLIC_SYNC_SERVER_WS_URL}/connect/${id}?accessToken=${encodeURIComponent(accessToken)}`,
                 assets: inlineBase64AssetStore,
                 users: { currentUser },
             }),
