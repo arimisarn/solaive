@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Tldraw, computed, createUserId, inlineBase64AssetStore, UserRecordType, type Editor } from 'tldraw';
 import 'tldraw/tldraw.css';
+import { getAssetUrls } from '@tldraw/assets/selfHosted';
 import { useSync } from '@tldraw/sync';
 import { Loader2, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
@@ -27,6 +28,14 @@ import { useTableauPresentation } from '@/hooks/use-tableau-presentation';
 import { usePresentationFollow } from '@/hooks/use-presentation-follow';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
 import type { TLShapeId } from 'tldraw';
+
+// Défini en dehors du composant (référence stable requise par tldraw, sinon
+// il recrée l'éditeur à chaque render). Pointe vers /public/tldraw-assets,
+// copié depuis node_modules/@tldraw/assets au build (voir package.json).
+// Nécessaire car le CDN par défaut (cdn.tldraw.com) est bloqué par Firefox :
+// il charge les icônes via un <use> SVG cross-origin, que Firefox interdit
+// pour des raisons de sécurité (contrairement à Chrome, plus permissif ici).
+const assetUrls = getAssetUrls({ baseUrl: '/tldraw-assets' });
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
 
@@ -323,7 +332,7 @@ function TableauWorkspace({
                 haut-droite) ont toute la place dans cette zone sans
                 collision avec le header. */}
             <div className="relative min-h-0 flex-1">
-                <Tldraw store={store} onMount={handleMount} />
+                <Tldraw store={store} assetUrls={assetUrls} onMount={handleMount} />
                 <CommentPins
                     editor={editorInstance}
                     comments={commentsApi.comments}
