@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Twitter, Github, Linkedin } from 'lucide-react';
 
 const FOOTER_COLUMNS = [
@@ -41,17 +42,33 @@ export function Footer() {
     <footer className="border-t border-border/60 bg-background">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-4">
+
+          {/* Branding */}
           <div className="md:col-span-1">
             <a
               href="#"
-              className="font-heading text-2xl font-bold text-accent"
+              className="flex items-center gap-2"
             >
-              Solaive
+              <Image
+                src="/logo.png"
+                alt="Solaive"
+                width={50}
+                height={50}
+                className="h-[50px] w-[50px] rounded-[5px] object-contain"
+                priority
+              />
+
+              <span className="font-heading text-2xl font-bold tracking-tight text-accent">
+                Solaive
+              </span>
             </a>
+
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-foreground/70">
               Le tableau blanc collaboratif pour les équipes qui pensent et
               créent ensemble.
             </p>
+
+            {/* Réseaux sociaux */}
             <div className="mt-4 flex gap-3">
               {SOCIALS.map((social) => (
                 <a
@@ -64,13 +81,20 @@ export function Footer() {
                 </a>
               ))}
             </div>
+
+            {/* Signature */}
+            <p className="mt-5 font-heading text-xs italic text-foreground/40">
+              Arimisa Nathalie
+            </p>
           </div>
 
+          {/* Colonnes du footer */}
           {FOOTER_COLUMNS.map((column) => (
             <div key={column.title}>
               <h3 className="font-heading text-sm font-semibold tracking-wide text-foreground">
                 {column.title}
               </h3>
+
               <ul className="mt-4 space-y-2.5">
                 {column.links.map((link) => (
                   <li key={link.label}>
@@ -87,6 +111,7 @@ export function Footer() {
           ))}
         </div>
 
+        {/* Copyright */}
         <div className="mt-12 border-t border-border/60 pt-6">
           <p className="text-center text-xs text-foreground/50">
             © {new Date().getFullYear()} Solaive. Tous droits réservés.

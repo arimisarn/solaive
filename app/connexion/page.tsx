@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
-import { AuthCard } from '@/components/auth/AuthCard';
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { GoogleButton } from '@/components/auth/GoogleButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +46,9 @@ export default function ConnexionPage() {
   }
 
   return (
-    <AuthCard
+    <AuthLayout
+      bannerTitle="Content de vous revoir"
+      bannerSubtitle="Connectez-vous pour retrouver vos tableaux et continuer à collaborer."
       title="Bienvenue sur Solaive"
       subtitle="Content de vous revoir. Connectez-vous pour continuer."
       footer={
@@ -127,6 +129,6 @@ export default function ConnexionPage() {
           {loading ? 'Connexion…' : 'Se connecter'}
         </button>
       </form>
-    </AuthCard>
+    </AuthLayout>
   );
 }

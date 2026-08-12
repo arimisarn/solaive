@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -25,13 +26,26 @@ export function Header() {
         className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
         aria-label="Navigation principale"
       >
+        {/* Logo */}
         <Link
           href="/"
-          className="font-heading text-2xl font-bold text-accent tracking-tight"
+          className="flex items-center gap-2"
         >
-          Solaive
+          <Image
+            src="/logo.png"
+            alt="Solaive"
+            width={50}
+            height={50}
+            className="h-[50px] w-[50px] rounded-[5px] object-contain"
+            priority
+          />
+
+          <span className="font-heading text-2xl font-bold tracking-tight text-accent">
+            Solaive
+          </span>
         </Link>
 
+        {/* Navigation desktop */}
         <ul className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
@@ -45,6 +59,7 @@ export function Header() {
           ))}
         </ul>
 
+        {/* CTA desktop */}
         <div className="hidden md:block">
           <Link
             href="/inscription"
@@ -54,6 +69,7 @@ export function Header() {
           </Link>
         </div>
 
+        {/* Menu mobile */}
         <button
           type="button"
           className="inline-flex items-center justify-center rounded-md p-2 text-foreground md:hidden"
@@ -61,10 +77,15 @@ export function Header() {
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {open ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
         </button>
       </nav>
 
+      {/* Menu mobile */}
       {open && (
         <div className="border-t border-border/60 bg-background md:hidden">
           <ul className="space-y-1 px-4 py-4">
@@ -79,6 +100,7 @@ export function Header() {
                 </Link>
               </li>
             ))}
+
             <li className="pt-2">
               <Link
                 href="/inscription"
