@@ -40,25 +40,12 @@ function colorForUser(id: string) {
 export default function TableauPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
-    // Instance stable sur tout le cycle de vie du composant : createClient()
-    // était appelé directement dans le corps du composant (donc un NOUVEL
-    // objet à chaque rendu) tout en étant listé dans les deps du useEffect
-    // ci-dessous -> l'effet se relançait à CHAQUE rendu, créant un nouveau
-    // client Supabase à chaque fois. Chaque nouveau client doit réhydrater
-    // sa session depuis les cookies de façon asynchrone ; plusieurs
-    // checkAccess() se chevauchaient donc en permanence, et celui qui
-    // terminait en dernier pouvait tomber sur une session pas encore
-    // complètement hydratée -> accessToken restait bloqué à null pour
-    // toujours (avec status déjà 'ok'), d'où le tableau qui ne charge jamais.
     const [supabase] = useState(() => createClient());
 
     const [status, setStatus] = useState<'checking' | 'ok' | 'not-found'>('checking');
     const [userInfo, setUserInfo] = useState<{ id: string; name: string } | null>(null);
     const [isOwner, setIsOwner] = useState(false);
     const [titre, setTitre] = useState<string | null>(null);
-    // Token JWT courant, transmis au serveur de sync WebSocket pour qu'il
-    // authentifie la connexion et détermine le rôle (au lieu d'accepter
-    // n'importe quelle connexion comme avant).
     const [accessToken, setAccessToken] = useState<string | null>(null);
 
     useEffect(() => {
@@ -70,10 +57,6 @@ export default function TableauPage() {
             }
 
             let { data: sessionData } = await supabase.auth.getSession();
-            // Filet de sécurité : juste après une redirection (ex. depuis /connexion),
-            // le client Supabase peut ne pas avoir fini de réhydrater la session depuis
-            // le storage au moment de ce premier appel. Un seul retry après un court
-            // délai suffit à éviter de partir avec un accessToken vide.
             if (!sessionData.session?.access_token) {
                 await new Promise((resolve) => setTimeout(resolve, 300));
                 ({ data: sessionData } = await supabase.auth.getSession());
@@ -85,9 +68,6 @@ export default function TableauPage() {
                 name: userData.user.email?.split('@')[0] ?? 'Utilisateur',
             });
 
-            // Pas de .eq('owner_id', ...) : la policy RLS "tableaux: lecture" laisse
-            // passer à la fois le owner et les membres invités via tableau_membres.
-            // Si la ligne n'existe pas ici, c'est que l'utilisateur n'a aucun accès.
             const { data, error } = await supabase
                 .from('tableaux')
                 .select('id, owner_id, titre')
@@ -122,15 +102,6 @@ export default function TableauPage() {
         );
     }
 
-    // IMPORTANT : on ne monte le workspace (donc on n'appelle useSync) qu'une fois
-    // l'utilisateur ET son accessToken connus (status === 'ok' && accessToken).
-    // Avant ce garde-fou, useSync() était appelé dès le tout premier rendu de CE
-    // composant (les hooks ne peuvent pas être conditionnels), donc avec un
-    // accessToken encore vide -> le serveur de sync fermait la connexion
-    // immédiatement (accessToken manquant) et le store restait bloqué en
-    // chargement indéfiniment, quel que soit le tableau ouvert. En isolant
-    // useSync dans un composant enfant distinct, ses hooks ne s'exécutent
-    // qu'au moment où on le monte réellement, donc avec un token déjà valide.
     if (status === 'checking' || !userInfo || !accessToken) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -169,12 +140,8 @@ function TableauWorkspace({
     const searchParams = useSearchParams();
     const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
     const templateAppliedRef = useRef(false);
-    // Chat, historique des versions et commentaires partagent le même
-    // emplacement de panneau flottant (bas-droite) : un seul à la fois.
     const [activePanel, setActivePanel] = useState<'chat' | 'versions' | 'comments' | null>(null);
-    // Mode "placement" : le prochain clic sur le canvas crée un nouveau pin de commentaire.
     const [commentPlacing, setCommentPlacing] = useState(false);
-    // Fil de commentaire actuellement affiché en bulle flottante sur le canvas.
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
     const currentUser = useMemo(
@@ -192,10 +159,6 @@ function TableauWorkspace({
     const store = useSync(
         useMemo(
             () => ({
-                // accessToken en query param : le serveur de sync l'utilise pour
-                // authentifier la connexion et déterminer le rôle (voir server/index.ts).
-                // Avant ce changement, N'IMPORTE QUELLE connexion WebSocket avec le bon
-                // ID de tableau était acceptée sans vérification — faille corrigée ici.
                 uri: `ws://localhost:5858/connect/${id}?accessToken=${encodeURIComponent(accessToken)}`,
                 assets: inlineBase64AssetStore,
                 users: { currentUser },
@@ -228,8 +191,6 @@ function TableauWorkspace({
         readonlyFromRole: isReadonlyRole,
     });
 
-    // Centre la caméra sur l'ancre du fil (position de la forme si elle existe
-    // encore, sinon les coordonnées d'origine du commentaire) puis l'ouvre.
     function focusThread(comment: Commentaire) {
         if (editorInstance) {
             const bounds = comment.shape_id ? editorInstance.getShapePageBounds(comment.shape_id) : null;
@@ -253,39 +214,36 @@ function TableauWorkspace({
         router.replace(`/tableau/${id}`);
     }
 
+    // ---------------------------------------------------------------------
+    // Layout : avant, le titre et la barre de boutons étaient posés en
+    // `position: absolute` PAR-DESSUS le canvas Tldraw, exactement aux mêmes
+    // coins que ses propres panneaux natifs (menu haut-gauche, panneau de
+    // style haut-droite qui s'agrandit dès qu'une forme est sélectionnée).
+    // Les deux se battaient donc pour le même espace.
+    //
+    // Ici on sort le titre + les boutons dans une vraie barre d'en-tête
+    // (flex-col, header en flow normal), et le canvas Tldraw occupe le
+    // reste de l'écran (flex-1). Tldraw positionne alors ses panneaux natifs
+    // à l'intérieur de SA propre zone, qui commence sous le header : plus
+    // aucun chevauchement possible, quelle que soit la sélection en cours.
+    // ---------------------------------------------------------------------
     return (
-        <div className="fixed inset-0">
-            <Tldraw store={store} onMount={handleMount} />
-            <CommentPins
-                editor={editorInstance}
-                comments={commentsApi.comments}
-                participants={commentsApi.participants}
-                currentUserId={userInfo.id}
-                placing={commentPlacing}
-                onPlacingChange={setCommentPlacing}
-                activeThreadId={activeThreadId}
-                onOpenThread={setActiveThreadId}
-                onCreateRoot={commentsApi.addComment}
-                onReply={(parentId, contenu, mentions) => commentsApi.addReply({ parentId, contenu, mentions })}
-                onToggleResolved={commentsApi.toggleResolved}
-                onDelete={commentsApi.deleteComment}
-                showResolved
-            />
-            <ReactionBursts editor={editorInstance} bursts={reactionsApi.bursts} />
-            {titre && (
-                <div className="pointer-events-none absolute left-3 top-3 z-[300]">
-                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur-sm">
-                        {titre}
-                        {isReadonlyRole && (
-                            <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium text-foreground/60">
-                                Lecture seule
-                            </span>
-                        )}
-                    </div>
+        <div className="fixed inset-0 flex flex-col bg-background">
+            {/* Header : titre à gauche, actions à droite. En flow normal,
+                donc jamais recouvert par / ne recouvrant jamais les
+                panneaux natifs de tldraw (qui ne vivent que dans la zone
+                canvas ci-dessous). */}
+            <header className="z-[300] flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-card/90 px-3 backdrop-blur-sm">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    {titre}
+                    {isReadonlyRole && (
+                        <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium text-foreground/60">
+                            Lecture seule
+                        </span>
+                    )}
                 </div>
-            )}
-            <div className="pointer-events-none absolute right-3 top-3 z-[300]">
-                <div className="pointer-events-auto flex items-center gap-2">
+
+                <div className="flex items-center gap-2">
                     <PresentationButton
                         presentateurId={presentationApi.state?.presentateur_id ?? null}
                         presentateurNom={presentationApi.state?.presentateur_nom ?? null}
@@ -344,10 +302,35 @@ function TableauWorkspace({
                             }
                         />
                     )}
-                    {/* Partage ouvert au owner ET aux membres avec le rôle "admin" —
-                        la suppression du tableau, elle, reste strictement réservée au owner. */}
                     {(isOwner || canManageSharing) && <ShareDialog tableauId={id} isOwner={isOwner} />}
                 </div>
+            </header>
+
+            {/* Zone canvas : tldraw + tout ce qui doit rester ancré au
+                canvas (pins de commentaires, bursts de réactions). Ces
+                éléments restent en `absolute` ici, mais ce conteneur ne
+                commence QUE sous le header, donc ils ne débordent plus
+                dessus, et les panneaux natifs de tldraw (bas-gauche,
+                haut-droite) ont toute la place dans cette zone sans
+                collision avec le header. */}
+            <div className="relative min-h-0 flex-1">
+                <Tldraw store={store} onMount={handleMount} />
+                <CommentPins
+                    editor={editorInstance}
+                    comments={commentsApi.comments}
+                    participants={commentsApi.participants}
+                    currentUserId={userInfo.id}
+                    placing={commentPlacing}
+                    onPlacingChange={setCommentPlacing}
+                    activeThreadId={activeThreadId}
+                    onOpenThread={setActiveThreadId}
+                    onCreateRoot={commentsApi.addComment}
+                    onReply={(parentId, contenu, mentions) => commentsApi.addReply({ parentId, contenu, mentions })}
+                    onToggleResolved={commentsApi.toggleResolved}
+                    onDelete={commentsApi.deleteComment}
+                    showResolved
+                />
+                <ReactionBursts editor={editorInstance} bursts={reactionsApi.bursts} />
             </div>
         </div>
     );
