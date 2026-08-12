@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { SUPABASE_COOKIE_OPTIONS } from './lib/supabase/cookie-options';
 
 export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request });
@@ -8,6 +9,7 @@ export async function middleware(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         {
+            cookieOptions: SUPABASE_COOKIE_OPTIONS,
             cookies: {
                 getAll() {
                     return request.cookies.getAll();
@@ -38,6 +40,18 @@ export async function middleware(request: NextRequest) {
     if (isProtected && !user) {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/connexion';
+        return NextResponse.redirect(redirectUrl);
+    }
+
+    // Si l'utilisateur est déjà connecté, on ne lui montre plus la landing
+    // page ni les pages de connexion/inscription : on l'envoie directement
+    // vers son tableau de bord.
+    const authPages = ['/', '/connexion', '/inscription'];
+    const isAuthPage = authPages.includes(request.nextUrl.pathname);
+
+    if (isAuthPage && user) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = '/tableau-de-bord';
         return NextResponse.redirect(redirectUrl);
     }
 
