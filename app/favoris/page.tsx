@@ -94,6 +94,7 @@ export default function FavorisPage() {
                                         onDeleted={(id) =>
                                             setTableaux((prev) => prev.filter((x) => x.id !== id))
                                         }
+                                        onDuplicated={load}
                                         animationDelay={`${i * 0.05}s`}
                                     />
                                 ))}

@@ -196,6 +196,7 @@ export default function TableauDeBordPage() {
                     isFavori
                     onToggleFavori={toggleFavori}
                     onDeleted={handleDeleted}
+                    onDuplicated={loadTableaux}
                     animationDelay={`${i * 0.05}s`}
                   />
                 ))}
@@ -234,6 +235,7 @@ export default function TableauDeBordPage() {
                     isFavori={false}
                     onToggleFavori={toggleFavori}
                     onDeleted={handleDeleted}
+                    onDuplicated={loadTableaux}
                     animationDelay={`${i * 0.05}s`}
                   />
                 ))}

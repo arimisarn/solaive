@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { PenLine, Star, Users, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { PenLine, Star, Users, Clock, Copy, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { ShareDialog } from '@/components/ShareDialog';
 import { formatActiviteRelative } from '@/lib/date-utils';
+import { createClient } from '@/lib/supabase/clients';
 import { cn } from '@/lib/utils';
 
 export type TableauAvecStats = {
@@ -33,6 +37,7 @@ export function TableauCard({
     isFavori,
     onToggleFavori,
     onDeleted,
+    onDuplicated,
     animationDelay,
 }: {
     tableau: TableauAvecStats;
@@ -40,9 +45,31 @@ export function TableauCard({
     isFavori: boolean;
     onToggleFavori: (id: string) => void;
     onDeleted?: (id: string) => void;
+    /** Appelé une fois la copie créée en base, pour rafraîchir la liste. */
+    onDuplicated?: () => void;
     animationDelay?: string;
 }) {
+    const router = useRouter();
+    const supabase = createClient();
+    const [duplicating, setDuplicating] = useState(false);
     const titre = tableau.titre || `Tableau du ${formatDate(tableau.created_at)}`;
+
+    async function handleDuplicate() {
+        setDuplicating(true);
+        const { data: newId, error } = await supabase.rpc('dupliquer_tableau', {
+            p_tableau_id: tableau.id,
+        });
+        setDuplicating(false);
+
+        if (error || !newId) {
+            toast.error('Impossible de dupliquer le tableau. Réessaie.');
+            return;
+        }
+
+        toast.success('Tableau dupliqué.');
+        onDuplicated?.();
+        router.push(`/tableau/${newId}`);
+    }
 
     return (
         <div
@@ -115,16 +142,36 @@ export function TableauCard({
                 )}
             </div>
 
-            {isOwner && (
-                <div className="mt-1 flex items-center justify-end gap-1">
-                    <DeleteBoardDialog
-                        tableauId={tableau.id}
-                        titre={titre}
-                        onDeleted={() => onDeleted?.(tableau.id)}
-                    />
-                    <ShareDialog tableauId={tableau.id} isOwner />
-                </div>
-            )}
+            <div className="mt-1 flex items-center justify-end gap-1">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        handleDuplicate();
+                    }}
+                    disabled={duplicating}
+                    title="Dupliquer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent disabled:opacity-60"
+                >
+                    {duplicating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Copy className="h-4 w-4" />
+                    )}
+                    Dupliquer
+                </button>
+
+                {isOwner && (
+                    <>
+                        <DeleteBoardDialog
+                            tableauId={tableau.id}
+                            titre={titre}
+                            onDeleted={() => onDeleted?.(tableau.id)}
+                        />
+                        <ShareDialog tableauId={tableau.id} isOwner />
+                    </>
+                )}
+            </div>
         </div>
     );
 }
