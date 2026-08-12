@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { track, type Editor } from 'tldraw';
+import { track, type Editor, type TLShapeId } from 'tldraw';
 import { MessageSquare, MessageSquarePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { MentionInput } from './MentionInput';
@@ -111,7 +111,7 @@ export const CommentPins = track(function CommentPins({
     }
 
     function anchorScreenPoint(c: Commentaire) {
-        const bounds = c.shape_id ? editor?.getShapePageBounds(c.shape_id) : null;
+        const bounds = c.shape_id ? editor?.getShapePageBounds(c.shape_id as TLShapeId) : null;
         const pagePoint = bounds ? { x: bounds.x, y: bounds.y } : { x: c.x, y: c.y };
         return editor!.pageToScreen(pagePoint);
     }
@@ -129,11 +129,10 @@ export const CommentPins = track(function CommentPins({
                         if (!placing) onOpenThread(null);
                     }}
                     title={placing ? 'Annuler le placement' : 'Ajouter un commentaire sur le tableau'}
-                    className={`pointer-events-auto fixed bottom-3 left-3 z-[300] flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm backdrop-blur-sm transition-colors ${
-                        placing
+                    className={`pointer-events-auto fixed bottom-3 left-3 z-[300] flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm backdrop-blur-sm transition-colors ${placing
                             ? 'border-accent bg-accent text-white'
                             : 'border-border/60 bg-card/90 text-foreground/60 hover:border-accent/40 hover:text-accent'
-                    }`}
+                        }`}
                 >
                     {placing ? <X className="h-4 w-4" /> : <MessageSquarePlus className="h-4 w-4" />}
                 </button>
@@ -155,11 +154,10 @@ export const CommentPins = track(function CommentPins({
                             type="button"
                             onClick={() => onOpenThread(activeThreadId === c.id ? null : c.id)}
                             style={{ left: screenPoint.x, top: screenPoint.y }}
-                            className={`pointer-events-auto fixed z-[300] flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full border px-1.5 py-1 text-[10px] font-medium shadow-sm transition-transform hover:scale-105 ${
-                                c.resolu
+                            className={`pointer-events-auto fixed z-[300] flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full border px-1.5 py-1 text-[10px] font-medium shadow-sm transition-transform hover:scale-105 ${c.resolu
                                     ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
                                     : 'border-accent/40 bg-accent text-white'
-                            }`}
+                                }`}
                         >
                             <MessageSquare className="h-3 w-3" />
                             {replyCount > 0 && <span>{replyCount + 1}</span>}

@@ -26,6 +26,7 @@ import { useReactions } from '@/hooks/use-reactions';
 import { useTableauPresentation } from '@/hooks/use-tableau-presentation';
 import { usePresentationFollow } from '@/hooks/use-presentation-follow';
 import { applyTemplate, type TemplateId } from '@/lib/templates';
+import type { TLShapeId } from 'tldraw';
 
 const VALID_TEMPLATE_IDS: TemplateId[] = ['kanban', 'retro', 'mindmap'];
 
@@ -193,12 +194,20 @@ function TableauWorkspace({
 
     function focusThread(comment: Commentaire) {
         if (editorInstance) {
-            const bounds = comment.shape_id ? editorInstance.getShapePageBounds(comment.shape_id) : null;
-            const point = bounds ? { x: bounds.x, y: bounds.y } : { x: comment.x, y: comment.y };
-            editorInstance.centerOnPoint(point, { animation: { duration: 200 } });
+            const bounds = comment.shape_id
+                ? editorInstance.getShapePageBounds(
+                    comment.shape_id as TLShapeId
+                )
+                : null;
+
+            const point = bounds
+                ? { x: bounds.x, y: bounds.y }
+                : { x: comment.x, y: comment.y };
+
+            editorInstance.centerOnPoint(point, {
+                animation: { duration: 200 },
+            });
         }
-        setActiveThreadId(comment.id);
-        setActivePanel(null);
     }
 
     function handleMount(editor: Editor) {

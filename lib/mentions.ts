@@ -11,7 +11,7 @@ export function extractMentions(contenu: string, participants: Participant[]): s
     for (const p of participants) {
         if (contenu.includes(`@${p.email}`)) found.add(p.user_id);
     }
-    return [...found];
+    return Array.from(found);
 }
 
 export function escapeRegExp(s: string) {

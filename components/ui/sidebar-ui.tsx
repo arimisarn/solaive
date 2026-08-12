@@ -215,7 +215,7 @@ export function SidebarMenuButton({
   isActive?: boolean;
   tooltip?: string;
 }) {
-  const Comp = asChild ? Slot : 'button';
+  const Comp: React.ElementType = asChild ? Slot : 'button';
   const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed' && !isMobile;
 
