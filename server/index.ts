@@ -358,6 +358,25 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', async (socket, req) => {
+    // Tampon critique : le client tldraw envoie son message "connect" DÈS
+    // l'ouverture du socket, sans attendre quoi que ce soit côté serveur.
+    // Or ce handler est async (vérification du token + du rôle via Supabase,
+    // donc plusieurs allers-retours réseau) : pendant ce court délai,
+    // room.handleSocketConnect() — qui est ce qui attache l'écouteur de
+    // messages — n'a pas encore été appelé. Le message "connect" arrivait
+    // donc dans le vide (aucun listener), et la session restait bloquée en
+    // "attente de connexion" jusqu'à ce que tldraw l'élimine tout seul après
+    // SESSION_START_WAIT_TIME (10s côté librairie) — ce qui correspond
+    // exactement au cycle de reconnexion en boucle observé. On bufferise
+    // donc tout message reçu avant que le listener définitif ne soit prêt,
+    // puis on le rejoue dans l'ordre une fois la room disponible.
+    const bufferedMessages: Array<string | Buffer | ArrayBuffer | Buffer[]> = [];
+    let buffering = true;
+    const bufferIncoming = (data: string | Buffer | ArrayBuffer | Buffer[]) => {
+        if (buffering) bufferedMessages.push(data);
+    };
+    socket.on('message', bufferIncoming);
+
     try {
         const url = new URL(req.url ?? '', `http://${req.headers.host}`);
         const match = url.pathname.match(/^\/connect\/(.+)$/);
@@ -404,6 +423,15 @@ wss.on('connection', async (socket, req) => {
         // peut de toute façon pas pousser de modification, la room les rejette.
         room.handleSocketConnect({ sessionId, socket, isReadonly: role === 'lecture' });
 
+        // Le listener définitif est maintenant en place : on arrête de
+        // bufferiser et on rejoue dans l'ordre tout ce qui est arrivé
+        // pendant l'authentification (typiquement le message "connect").
+        buffering = false;
+        socket.off('message', bufferIncoming);
+        for (const data of bufferedMessages) {
+            room.handleSocketMessage(sessionId, data as any);
+        }
+
         socket.on('close', (code, reason) => {
             console.log(`[${new Date().toISOString()}] Socket fermé room ${roomId} — session ${sessionId} — code ${code} — raison "${reason.toString()}"`);
         });
@@ -416,6 +444,7 @@ wss.on('connection', async (socket, req) => {
         // et on ferme systématiquement pour que le client puisse au moins
         // retenter, et que l'erreur soit visible dans le terminal du serveur.
         console.error('Erreur inattendue lors de la connexion WebSocket :', err);
+        socket.off('message', bufferIncoming);
         try {
             socket.close();
         } catch {
