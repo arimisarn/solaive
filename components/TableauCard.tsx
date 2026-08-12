@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PenLine, Star, Users, Clock, Copy, Loader2 } from 'lucide-react';
+import { PenLine, Star, Users, Clock, Copy, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DeleteBoardDialog } from '@/components/DeleteBoardDialog';
 import { ShareDialog } from '@/components/ShareDialog';
@@ -151,14 +151,14 @@ export function TableauCard({
                     }}
                     disabled={duplicating}
                     title="Dupliquer"
-                    className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent disabled:opacity-60"
+                    aria-label="Dupliquer"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/80 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent disabled:opacity-60"
                 >
                     {duplicating ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <Copy className="h-4 w-4" />
                     )}
-                    Dupliquer
                 </button>
 
                 {isOwner && (
@@ -167,8 +167,31 @@ export function TableauCard({
                             tableauId={tableau.id}
                             titre={titre}
                             onDeleted={() => onDeleted?.(tableau.id)}
+                            trigger={
+                                <button
+                                    type="button"
+                                    title="Supprimer"
+                                    aria-label="Supprimer"
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/80 transition-colors hover:border-red-500 hover:bg-red-600 hover:text-white"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            }
                         />
-                        <ShareDialog tableauId={tableau.id} isOwner />
+                        <ShareDialog
+                            tableauId={tableau.id}
+                            isOwner
+                            trigger={
+                                <button
+                                    type="button"
+                                    title="Partager"
+                                    aria-label="Partager"
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/80 transition-colors hover:border-accent/40 hover:text-accent"
+                                >
+                                    <Users className="h-4 w-4" />
+                                </button>
+                            }
+                        />
                     </>
                 )}
             </div>
