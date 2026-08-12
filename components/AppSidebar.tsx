@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Bell, Star } from 'lucide-react';
+import { LayoutDashboard, LogOut, Bell, Star, Keyboard } from 'lucide-react';
 import { createClient } from '@/lib/supabase/clients';
 import { useInvitationsCount } from '@/components/InvitationsList';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -81,6 +81,15 @@ export function AppSidebar() {
                   <Bell className="h-4 w-4 shrink-0" />
                   <span data-sidebar="label">Invitations</span>
                   {invitationsCount > 0 && <SidebarBadge>{invitationsCount}</SidebarBadge>}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Raccourcis clavier">
+                <Link href="/raccourcis">
+                  <Keyboard className="h-4 w-4 shrink-0" />
+                  <span data-sidebar="label">Raccourcis</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
