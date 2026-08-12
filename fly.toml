@@ -1,0 +1,19 @@
+app = "solaive-sync"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "Dockerfile.sync"
+
+[env]
+  PORT = "5858"
+
+[http_service]
+  internal_port = 5858
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

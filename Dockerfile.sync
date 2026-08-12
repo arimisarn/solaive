@@ -1,0 +1,17 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# On copie uniquement ce qui est nécessaire pour installer les dépendances
+# (meilleur cache Docker : si le code change mais pas package.json, l'étape
+# npm install n'est pas relancée).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm install --no-save tsx
+
+# Le serveur n'a besoin que de server/ (pas de app/, components/, etc.)
+COPY server ./server
+COPY tsconfig.json ./
+
+EXPOSE 5858
+
+CMD ["npx", "tsx", "server/index.ts"]
