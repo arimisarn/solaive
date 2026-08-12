@@ -347,7 +347,38 @@ const httpServer = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server: httpServer });
 
+// Heartbeat applicatif : Render (et la plupart des reverse proxies/load
+// balancers en prod) coupe silencieusement une connexion WebSocket jugée
+// inactive après un délai d'idle — sans frame de fermeture WS propre, d'où
+// les codes 1006 ("abnormal closure") observés en boucle toutes les
+// quelques secondes. Le protocole tldraw/sync a son propre échange de
+// messages, mais ça ne suffit pas à garder la connexion TCP "chaude" aux
+// yeux du proxy s'il n'y a pas de trafic WS natif ping/pong régulier.
+// On envoie donc un ping toutes les 25s ; toute socket qui n'a pas répondu
+// par un pong depuis le ping précédent est considérée morte et fermée.
+const HEARTBEAT_INTERVAL_MS = 25_000;
+
+function heartbeat(this: import('ws').WebSocket) {
+    (this as any).isAlive = true;
+}
+
+const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((socket) => {
+        if ((socket as any).isAlive === false) {
+            socket.terminate();
+            return;
+        }
+        (socket as any).isAlive = false;
+        socket.ping();
+    });
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => clearInterval(heartbeatInterval));
+
 wss.on('connection', async (socket, req) => {
+    (socket as any).isAlive = true;
+    socket.on('pong', heartbeat);
+
     // Tampon critique : le client tldraw envoie son message "connect" DÈS
     // l'ouverture du socket, sans attendre quoi que ce soit côté serveur.
     // Or ce handler est async (vérification du token + du rôle via Supabase,
