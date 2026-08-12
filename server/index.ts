@@ -5,7 +5,7 @@ import { createTLSchema, type TLRecord } from '@tldraw/tlschema';
 import { createClient } from '@supabase/supabase-js';
 import { getUserRoleForBoard as resolveUserRoleForBoard, type SupabaseLike } from './access-control';
 
-const PORT = 5858;
+const PORT = Number(process.env.PORT) || 5858;
 const SAVE_INTERVAL_MS = 20_000;
 // Intervalle d'archivage dans l'historique des versions : volontairement plus
 // espacé que SAVE_INTERVAL_MS (qui ne fait que persister l'état courant).
