@@ -21,6 +21,7 @@ export function useTableauRole({ tableauId, isOwner }: { tableauId: string; isOw
 
     useEffect(() => {
         if (isOwner) {
+            console.log(`[DEBUG role] ${new Date().toISOString()} isOwner=true => role=admin`);
             setRole('admin');
             setLoading(false);
             return;
@@ -29,17 +30,24 @@ export function useTableauRole({ tableauId, isOwner }: { tableauId: string; isOw
 
         let cancelled = false;
         async function load() {
+            console.log(`[DEBUG role] ${new Date().toISOString()} isOwner=false, appel obtenir_mon_role...`);
             setLoading(true);
             const supabase = createClient();
             const { data, error } = await supabase.rpc('obtenir_mon_role', { p_tableau_id: tableauId });
-            if (cancelled) return;
+            if (cancelled) {
+                console.log(`[DEBUG role] ${new Date().toISOString()} réponse obtenir_mon_role ignorée (cancelled=true)`);
+                return;
+            }
 
             if (error) {
                 console.error('obtenir_mon_role:', error.message);
+                console.log(`[DEBUG role] ${new Date().toISOString()} erreur RPC => role=lecture (fail-closed)`);
                 setRole('lecture');
             } else {
                 const value = data as TableauRole | null;
-                setRole(value === 'edition' || value === 'admin' || value === 'lecture' ? value : 'lecture');
+                const resolved = value === 'edition' || value === 'admin' || value === 'lecture' ? value : 'lecture';
+                console.log(`[DEBUG role] ${new Date().toISOString()} RPC a répondu data="${value}" => role=${resolved}`);
+                setRole(resolved);
             }
             setLoading(false);
         }
