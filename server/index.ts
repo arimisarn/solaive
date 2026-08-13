@@ -356,7 +356,11 @@ const wss = new WebSocketServer({ server: httpServer });
 // yeux du proxy s'il n'y a pas de trafic WS natif ping/pong régulier.
 // On envoie donc un ping toutes les 25s ; toute socket qui n'a pas répondu
 // par un pong depuis le ping précédent est considérée morte et fermée.
-const HEARTBEAT_INTERVAL_MS = 25_000;
+// Premier essai à 25s (recommandation générique) : insuffisant en pratique
+// sur Render, où les coupures observées arrivaient en 5-13s — bien plus tôt
+// que ce que documente Render officiellement ("pas de timeout imposé").
+// On resserre donc largement la marge de sécurité.
+const HEARTBEAT_INTERVAL_MS = 8_000;
 
 function heartbeat(this: import('ws').WebSocket) {
     (this as any).isAlive = true;
