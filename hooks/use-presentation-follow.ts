@@ -48,9 +48,15 @@ export function usePresentationFollow({
     readonlyFromRole?: boolean;
 }) {
     useEffect(() => {
+        console.log(
+            `[DEBUG presence] ${new Date().toISOString()} effect run — editor=${!!editor} presentateurId=${presentateurId} currentUserId=${currentUserId} readonlyFromRole=${readonlyFromRole}`
+        );
         if (!editor) return;
 
         const isSpectator = !!presentateurId && presentateurId !== currentUserId;
+        console.log(
+            `[DEBUG presence] ${new Date().toISOString()} isSpectator=${isSpectator} => updateInstanceState isReadonly=${isSpectator || readonlyFromRole}`
+        );
 
         if (isSpectator) {
             // Cast défensif : selon les versions de tldraw, TLUserId est un
