@@ -354,25 +354,30 @@ const wss = new WebSocketServer({ server: httpServer });
 // quelques secondes. Le protocole tldraw/sync a son propre échange de
 // messages, mais ça ne suffit pas à garder la connexion TCP "chaude" aux
 // yeux du proxy s'il n'y a pas de trafic WS natif ping/pong régulier.
-// On envoie donc un ping toutes les 25s ; toute socket qui n'a pas répondu
-// par un pong depuis le ping précédent est considérée morte et fermée.
-// Premier essai à 25s (recommandation générique) : insuffisant en pratique
-// sur Render, où les coupures observées arrivaient en 5-13s — bien plus tôt
-// que ce que documente Render officiellement ("pas de timeout imposé").
-// On resserre donc largement la marge de sécurité.
-const HEARTBEAT_INTERVAL_MS = 8_000;
+//
+// ATTENTION — piège vécu ici : un intervalle trop court COMBINÉ à une
+// tolérance d'un seul ping manqué a l'effet inverse de celui recherché.
+// Sur Render, la latence aller-retour peut dépasser la fenêtre d'un cycle
+// (surtout juste après l'ouverture de la socket, pendant qu'elle "monte en
+// charge"), donc un pong légèrement en retard faisait couper une connexion
+// parfaitement saine — visible dans les logs comme une fermeture ~8s après
+// chaque connexion, soit exactement la durée de l'intervalle. On ajoute donc
+// une vraie tolérance de 2 pings manqués consécutifs avant de couper.
+const HEARTBEAT_INTERVAL_MS = 10_000;
+const MAX_MISSED_PONGS = 2;
 
 function heartbeat(this: import('ws').WebSocket) {
-    (this as any).isAlive = true;
+    (this as any).missedPongs = 0;
 }
 
 const heartbeatInterval = setInterval(() => {
     wss.clients.forEach((socket) => {
-        if ((socket as any).isAlive === false) {
+        const missed = (socket as any).missedPongs ?? 0;
+        if (missed >= MAX_MISSED_PONGS) {
             socket.terminate();
             return;
         }
-        (socket as any).isAlive = false;
+        (socket as any).missedPongs = missed + 1;
         socket.ping();
     });
 }, HEARTBEAT_INTERVAL_MS);
@@ -380,7 +385,7 @@ const heartbeatInterval = setInterval(() => {
 wss.on('close', () => clearInterval(heartbeatInterval));
 
 wss.on('connection', async (socket, req) => {
-    (socket as any).isAlive = true;
+    (socket as any).missedPongs = 0;
     socket.on('pong', heartbeat);
 
     // Tampon critique : le client tldraw envoie son message "connect" DÈS
